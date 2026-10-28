@@ -1,9 +1,22 @@
 [project]
 name = "phantom-oracle"
-version = "0.1.0"
+version = "0.2.0"
 description = "TabPFN anomaly scan over the Vale Archive's telemetry, with baselines"
 requires-python = ">=3.11,<3.14"
-dependencies = ["fastapi>=0.120", "uvicorn>=0.38", "pandas>=2.3", "scikit-learn>=1.7"]
+dependencies = [
+  "fastapi>=0.120",
+  "uvicorn>=0.38",
+  "pandas>=2.3",
+  "scikit-learn>=1.7",
+  "tabpfn>=2.2",
+  "torch>=2.6",
+]
 
-[project.optional-dependencies]
-tabpfn = ["tabpfn>=2.2"]
+# On the droplet there is no GPU: take the CPU build of torch, not 3 GB of CUDA.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

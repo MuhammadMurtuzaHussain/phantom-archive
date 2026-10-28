@@ -7,7 +7,7 @@ import { ghostModel } from "./agent/model.ts";
 import { mastra } from "./mastra/index.ts";
 import { createSession, evidenceFor, getSession, vale, view, type Session } from "./game/store.ts";
 import { ghostTurn } from "./game/ghost.ts";
-import { scanReport } from "./game/scan.ts";
+import { oracleScan } from "./game/scan.ts";
 import { tick } from "./game/night.ts";
 
 const app = new Hono();
@@ -49,9 +49,13 @@ api.post("/:id/pin/:eid", (c) => {
   return c.json(view(s));
 });
 
-api.post("/:id/scan", (c) => {
+api.post("/:id/scan", async (c) => {
   const s = c.get("s");
-  s.overrides["EV-012"] = scanReport();
+  const scan = await oracleScan();
+  s.overrides["EV-012"] = scan.body;
+  if (scan.source === "fallback") {
+    s.transcript.push({ role: "system", text: `The oracle did not answer (${scan.reason}). EV-012 is the archive's own z-score scan instead.`, at: new Date().toISOString() });
+  }
   s.state = E.markScanned(vale, s.state);
   return c.json(view(s));
 });
