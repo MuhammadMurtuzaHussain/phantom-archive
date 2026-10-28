@@ -1,7 +1,7 @@
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
 import * as E from "@phantom/case-engine";
-import { getSession, vale } from "../game/store.ts";
+import { sessionFor, vale } from "../game/store.ts";
 import { recordClaims, speak } from "../game/ghost.ts";
 
 // Challenging the ghost, as a Mastra workflow:
@@ -15,11 +15,8 @@ const spoken = judged.extend({ reply: z.string(), claims: z.array(z.any()), face
 const out = spoken.extend({ ledgerIds: z.array(z.string()) });
 
 const now = () => new Date().toISOString();
-const must = (id: string) => {
-  const s = getSession(id);
-  if (!s) throw new Error(`no session ${id}`);
-  return s;
-};
+// The game always passes a live session. Run from Studio, the workflow works on Studio's own case file.
+const must = (id: string) => sessionFor(id);
 
 const judge = createStep({
   id: "judge",
@@ -76,7 +73,7 @@ const record = createStep({
   },
 });
 
-type Session = NonNullable<ReturnType<typeof getSession>>;
+type Session = ReturnType<typeof sessionFor>;
 
 export const challengeWorkflow = createWorkflow({ id: "challenge", inputSchema: input, outputSchema: out })
   .then(judge)

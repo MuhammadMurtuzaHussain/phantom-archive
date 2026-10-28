@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadCase } from "./load.ts";
 import * as E from "./engine.ts";
@@ -96,4 +97,9 @@ test("running out of night with the truth pinned gives the bitter Midnight", () 
   for (const id of ["EV-006", "EV-017", "EV-021"]) s = E.togglePin(s, id);
   while (!E.nightOver(vale, s)) s = E.ask(s);
   assert.equal(E.midnight(vale, s).ending?.variant, "true");
+});
+
+test("case.bundle.json matches the case folder (run the bundle script after editing evidence)", () => {
+  const bundled = JSON.parse(readFileSync(fileURLToPath(new URL("../../../content/cases/vale/case.bundle.json", import.meta.url)), "utf8"));
+  assert.deepEqual(bundled, JSON.parse(JSON.stringify(vale)));
 });

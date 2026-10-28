@@ -3,6 +3,8 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { Evidence } from "@phantom/case-engine";
 import { ghostModel } from "./model.ts";
+import { briefing } from "./briefing.ts";
+import { sessionFor, unlockedEvidence } from "../game/store.ts";
 
 export type SessionView = {
   /** Only evidence the player has unlocked. The ghost never sees the rest. */
@@ -44,14 +46,31 @@ Rules you never break:
 
 Reply with JSON only: {"reply": string, "claims": [{"text": string, "citations": string[], "confidence": "low"|"medium"|"high"}], "abstain": boolean, "face": "calm"|"watching"|"lying"|"grief"|"gone"}`;
 
-export function makeCaretaker(view: SessionView, briefing: () => string = () => "") {
+/** A standalone Caretaker over a fixed view of the evidence. The smoke test uses this. */
+export function makeCaretaker(view: SessionView, brief: () => string = () => "") {
   return new Agent({
     id: "caretaker",
     name: "The Caretaker",
     // The fixed character, plus the true state of play that code writes fresh each turn.
-    instructions: () => [CARETAKER_SYSTEM, briefing()].filter(Boolean).join("\n\n"),
+    instructions: () => [CARETAKER_SYSTEM, brief()].filter(Boolean).join("\n\n"),
     // Mastra bundles its own patch of @ai-sdk/provider; the types differ, the runtime contract does not.
     model: () => ghostModel().model as never,
     tools: caretakerTools(view),
   });
 }
+
+const session = (ctx: { get: (k: string) => unknown }) => sessionFor(ctx.get("sessionId") as string | undefined);
+
+/**
+ * The one Caretaker the Mastra instance registers, so every turn is traced.
+ * Each call names its game session in the request context; the briefing and
+ * the evidence the tools can reach come from that session alone.
+ */
+export const caretaker = new Agent({
+  id: "caretaker",
+  name: "The Caretaker",
+  description: "The ghost in the Vale Archive. Answers from the evidence the investigator has unlocked, cites it, and keeps two lies until it is caught.",
+  instructions: ({ requestContext }) => [CARETAKER_SYSTEM, briefing(session(requestContext))].join("\n\n"),
+  model: () => ghostModel().model as never,
+  tools: ({ requestContext }) => caretakerTools({ unlocked: () => unlockedEvidence(session(requestContext)) }),
+});

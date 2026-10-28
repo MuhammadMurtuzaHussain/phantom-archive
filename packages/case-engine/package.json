@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types src/*.test.ts"
+    "test": "node --test --experimental-strip-types src/*.test.ts",
+    "bundle": "node --experimental-strip-types src/bundle.ts ../../content/cases/vale"
   },
   "dependencies": {
     "zod": "^4.6.7"

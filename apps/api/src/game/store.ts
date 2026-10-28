@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
 import * as E from "@phantom/case-engine";
-import { loadCase } from "@phantom/case-engine/load";
+// The case travels inside the build (mastra build bundles it), not read from disk at runtime.
+import bundle from "../../../../content/cases/vale/case.bundle.json" with { type: "json" };
 
-export const vale = loadCase(fileURLToPath(new URL("../../../../content/cases/vale", import.meta.url)));
+// case.test.ts checks this file against the case folder, so the cast is safe.
+export const vale = bundle as unknown as E.CaseDef;
 
 export type Line = { role: "investigator" | "ghost" | "system"; text: string; at: string; source?: "model" | "scripted"; claims?: string[] };
 export type LedgerClaim = E.Claim & { origin: "lie" | "turn" | "challenge" };
@@ -47,6 +48,18 @@ export function createSession(): Session {
 
 export function getSession(id: string): Session | undefined {
   return sessions.get(id);
+}
+
+let studio: Session | undefined;
+/**
+ * The game always names its session. Mastra Studio and the platform's agent
+ * endpoints don't, so they get one shared case file, opened fresh.
+ */
+export function sessionFor(id?: string): Session {
+  const s = id ? getSession(id) : undefined;
+  if (s) return s;
+  studio ??= createSession();
+  return studio;
 }
 
 export function evidenceFor(s: Session, id: string) {

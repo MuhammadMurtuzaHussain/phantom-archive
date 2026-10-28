@@ -1,17 +1,14 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
-import { Mastra } from "@mastra/core";
 import { z } from "zod";
 import * as E from "@phantom/case-engine";
 import { ghostModel } from "./agent/model.ts";
-import { challengeWorkflow } from "./agent/challenge.ts";
+import { mastra } from "./mastra/index.ts";
 import { createSession, evidenceFor, getSession, vale, view, type Session } from "./game/store.ts";
 import { ghostTurn } from "./game/ghost.ts";
 import { scanReport } from "./game/scan.ts";
 import { tick } from "./game/night.ts";
-
-export const mastra = new Mastra({ workflows: { challengeWorkflow }, logger: false });
 
 const app = new Hono();
 const api = new Hono<{ Variables: { s: Session } }>();
