@@ -1,0 +1,12 @@
+{
+  "name": "phantom-archive",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "smoke": "pnpm --filter @phantom/api smoke"
+  }
+}

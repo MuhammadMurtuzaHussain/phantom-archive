@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #07090a;
+  --color-phosphor: #8cffb0;
+  --color-amber: #ffb547;
+  --color-marigold: #ff8a1f;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+body { @apply bg-void text-phosphor font-mono; }

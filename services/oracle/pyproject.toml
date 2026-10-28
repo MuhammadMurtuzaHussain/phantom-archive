@@ -1,0 +1,9 @@
+[project]
+name = "phantom-oracle"
+version = "0.1.0"
+description = "TabPFN anomaly scan over the Vale Archive's telemetry, with baselines"
+requires-python = ">=3.11,<3.14"
+dependencies = ["fastapi>=0.120", "uvicorn>=0.38", "pandas>=2.3", "scikit-learn>=1.7"]
+
+[project.optional-dependencies]
+tabpfn = ["tabpfn>=2.2"]
