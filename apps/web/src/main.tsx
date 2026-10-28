@@ -1,6 +1,5 @@
-import { StrictMode, useCallback, useLayoutEffect, useEffect, useRef, useState } from "react";
+import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { createPortal } from "react-dom";
 import "./index.css";
 import { api, type Evidence, type View } from "./api";
 import { Terminal, typingMs, type LocalLine } from "./components/Terminal";
@@ -10,7 +9,8 @@ import { HELP, hint, parse, relicAwake, stages, type Stage } from "./progress";
 import { clockLabel, setBurned, setPowered } from "./clock";
 import { isMuted, onMute, powerOff, powerOn, setMuted } from "./sound";
 import { listenToRealKeyboard } from "./keys";
-import { SCREEN_PX } from "./scene/size";
+import { Intro, introSeen } from "./intro/Intro";
+import { Desk } from "./desk/Desk";
 
 const KEY = "phantom-archive:session";
 const store = {
@@ -263,13 +263,14 @@ function SoundToggle() {
   return <button onClick={() => setMuted(!muted)} className="hover:text-amber">{muted ? "sound off" : "sound on"}</button>;
 }
 
-function webgl() {
-  try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; }
-}
-
+/** The intro plays once; ?intro replays it. Phones get the flat terminal after it. */
 function Monitor() {
-  const flat = innerWidth < 820 || new URLSearchParams(location.search).has("flat") || !webgl();
-  useEffect(() => { listenToRealKeyboard(); }, []);
+  const params = new URLSearchParams(location.search);
+  const flat = innerWidth < 820 || params.has("flat");
+  const [stage, setStage] = useState<"intro" | "desk">(params.has("intro") || !introSeen() ? "intro" : "desk");
+  // Typing sounds belong to the desk, not to walking in the intro.
+  useEffect(() => { if (stage === "desk") listenToRealKeyboard(); }, [stage]);
+  if (stage === "intro") return <Intro onDone={() => setStage("desk")} />;
   if (flat) {
     return (
       <main className="h-full p-[clamp(0px,1.2vw,14px)]">
@@ -277,31 +278,7 @@ function Monitor() {
       </main>
     );
   }
-  return <DeskView />;
-}
-
-/** The 3D desk. The game renders through a portal into a node that sits on the CRT's glass. */
-function DeskView() {
-  const room = useRef<HTMLDivElement>(null);
-  const [glass] = useState(() => {
-    const el = document.createElement("div");
-    el.style.width = `${SCREEN_PX.w}px`;
-    el.style.height = `${SCREEN_PX.h}px`;
-    return el;
-  });
-  // three.js loads only here, so the flat CRT on phones never downloads it.
-  useLayoutEffect(() => {
-    let off: (() => void) | undefined;
-    let gone = false;
-    void import("./scene/desk").then(({ mountDesk }) => { if (!gone) off = mountDesk(room.current!, glass); });
-    return () => { gone = true; off?.(); };
-  }, [glass]);
-  return (
-    <>
-      <div ref={room} className="fixed inset-0 bg-[#050504]" />
-      {createPortal(<div className="screen @container h-full text-[15px]"><Game /></div>, glass)}
-    </>
-  );
+  return <Desk><div className="screen power-on @container h-full text-[15px]"><Game /></div></Desk>;
 }
 
 createRoot(document.getElementById("root")!).render(<StrictMode><Monitor /></StrictMode>);

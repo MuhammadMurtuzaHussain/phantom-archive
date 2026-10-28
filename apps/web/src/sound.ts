@@ -1,5 +1,6 @@
-// Every sound is synthesized in WebAudio: no sample files, nothing to license.
-// Audio only starts after a user gesture (the "press enter to connect").
+// Sound: recorded effects and ambiences generated with ElevenLabs (public/audio),
+// played through WebAudio. The synthesized versions below stay as the fallback
+// until the samples load, or if they can't. Audio only starts after a user gesture.
 
 const KEY = "phantom-archive:muted";
 let ctx: AudioContext | null = null;
@@ -28,9 +29,83 @@ function noiseBuffer(c: AudioContext) {
   return noise;
 }
 
+// ---- samples ---------------------------------------------------------------
+
+const SAMPLES = [
+  "amb-snow", "amb-roof", "amb-room", "crt-hum", "holo-hum", "steps", "hologram-line",
+  "key-1", "key-2", "key-3", "key-4", "key-enter", "key-space", "crt-on", "door", "match", "snuff", "power-cut",
+] as const;
+export type Sample = (typeof SAMPLES)[number];
+const buffers = new Map<Sample, AudioBuffer>();
+let loading: Promise<void> | null = null;
+
+/** Fetch and decode every sample once. Safe to call repeatedly. */
+export function loadSamples() {
+  loading ??= Promise.all(SAMPLES.map(async (name) => {
+    try {
+      const data = await (await fetch(`/audio/${name}.mp3`)).arrayBuffer();
+      buffers.set(name, await ac().decodeAudioData(data));
+    } catch { /* that one sound falls back or stays silent */ }
+  })).then(() => undefined);
+  return loading;
+}
+
+/** Play a one-shot. Returns how long it lasts, in seconds. */
+export function play(name: Sample, { gain = 1, rate = 1, delay = 0 } = {}): number {
+  const buf = buffers.get(name);
+  if (!buf || muted) return 0;
+  const c = ac();
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = rate;
+  const g = c.createGain();
+  g.gain.value = gain;
+  src.connect(g).connect(master!);
+  src.start(c.currentTime + delay);
+  return buf.duration / rate;
+}
+
+export type Loop = { fade: (to: number, secs?: number) => void; stop: (secs?: number) => void };
+const silentLoop: Loop = { fade: () => {}, stop: () => {} };
+
+/** A looping bed (ambience, hum, footsteps) that fades in, and can fade or stop. */
+export function loop(name: Sample, gain = 1, fadeIn = 1.5): Loop {
+  const buf = buffers.get(name);
+  if (!buf) return silentLoop;
+  const c = ac();
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  // MP3 encoders pad both ends; loop inside the padding so the seam doesn't click.
+  src.loopStart = Math.min(0.05, buf.duration / 10);
+  src.loopEnd = buf.duration - Math.min(0.05, buf.duration / 10);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, c.currentTime);
+  g.gain.linearRampToValueAtTime(gain, c.currentTime + fadeIn);
+  src.connect(g).connect(master!);
+  src.start(c.currentTime, src.loopStart);
+  const fade = (to: number, secs = 0.4) => g.gain.setTargetAtTime(Math.max(to, 0.0001), c.currentTime, secs / 3);
+  return {
+    fade,
+    stop: (secs = 1) => { fade(0, secs); src.stop(c.currentTime + secs + 0.1); },
+  };
+}
+
+let keyTurn = 0;
+/** A real key from the four recorded takes, never quite the same twice. */
+function sampledKey(kind: "key" | "space" | "enter" | "ghost") {
+  const name: Sample = kind === "space" ? "key-space" : kind === "enter" ? "key-enter" : (`key-${(keyTurn++ % 4) + 1}` as Sample);
+  if (!buffers.has(name)) return false;
+  play(name, { gain: kind === "ghost" ? 0.35 : 0.8, rate: 0.94 + Math.random() * 0.12 });
+  return true;
+}
+
+// ---- synthesized fallbacks ----------------------------------------------------
+
 /** A mechanical key: a filtered click on the way down, a soft thump as it bottoms out. */
 export function keyClick(kind: "key" | "space" | "enter" | "ghost" = "key") {
   if (muted) return;
+  if (sampledKey(kind)) return;
   const c = ac();
   const t = c.currentTime;
   const ghost = kind === "ghost";
@@ -65,6 +140,11 @@ export function keyClick(kind: "key" | "space" | "enter" | "ghost" = "key") {
 /** The tube warming up: a thunk, then a rising whine that settles. */
 export function powerOn() {
   if (muted) return;
+  if (buffers.has("crt-on")) {
+    play("crt-on", { gain: 0.7 });
+    startHum();
+    return;
+  }
   const c = ac();
   const t = c.currentTime;
   const o = c.createOscillator();
@@ -88,6 +168,12 @@ export function powerOn() {
 /** The city cuts the power: the tube's whine falls away and the hum stops. */
 export function powerOff() {
   if (!ctx || !master) return;
+  if (buffers.has("power-cut")) {
+    play("power-cut");
+    hum?.stop();
+    hum = null;
+    return;
+  }
   const c = ctx;
   const t = c.currentTime;
   const o = c.createOscillator();
@@ -110,6 +196,11 @@ export function powerOff() {
 /** Mains hum from the old set, barely there. */
 function startHum() {
   if (hum) return;
+  if (buffers.has("crt-hum")) {
+    const h = loop("crt-hum", 0.5, 2);
+    hum = { stop: () => h.stop(0.3) };
+    return;
+  }
   const c = ac();
   const o = c.createOscillator();
   o.frequency.value = 50;

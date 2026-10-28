@@ -75,3 +75,26 @@ button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.4; }
 button:focus-visible { outline: 1px dashed var(--color-amber); outline-offset: 3px; }
 input { caret-color: var(--color-amber); }
+
+/* The intro: slow, quiet, no bounce. */
+@keyframes intro-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes intro-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.intro-pulse { animation: intro-pulse 2.8s ease-in-out infinite; }
+.intro-card p { animation: intro-rise 1.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.intro-caption { animation: line-in 500ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .intro-pulse, .intro-card p { animation: none; }
+}
+
+/* A wisp of smoke from the wick when the candle is snuffed. */
+.candle-smoke {
+  width: 28px; height: 70px; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 80%, rgb(210 214 220 / 0.55), transparent 70%);
+  filter: blur(6px);
+  animation: candle-smoke 2.6s ease-out forwards;
+}
+@keyframes candle-smoke {
+  0% { opacity: 0; transform: translateY(20px) scaleY(0.6); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-140px) translateX(18px) scaleY(1.8) scaleX(1.6); }
+}

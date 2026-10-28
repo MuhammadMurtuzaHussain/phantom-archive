@@ -1,15 +1,8 @@
 import { keyClick } from "./sound";
 
-// One bus for every key press, yours or the ghost's. The 3D keyboard listens
-// and pushes the matching keycap down; the sound engine clicks.
-
-export type Press = { code: string; ghost: boolean };
-const subs = new Set<(p: Press) => void>();
-
-export function onPress(f: (p: Press) => void) { subs.add(f); return () => { subs.delete(f); }; }
+// Every key press, yours or the ghost's, sounds like the old keyboard on the desk.
 
 export function press(code: string, ghost = false) {
-  subs.forEach((f) => f({ code, ghost }));
   keyClick(ghost ? "ghost" : code === "Space" ? "space" : code === "Enter" ? "enter" : "key");
 }
 
@@ -23,7 +16,7 @@ export function codeForChar(ch: string): string | null {
 }
 
 let installed = false;
-/** Your real keyboard drives the 3D one. */
+/** Your real keyboard, heard. */
 export function listenToRealKeyboard() {
   if (installed) return;
   installed = true;
