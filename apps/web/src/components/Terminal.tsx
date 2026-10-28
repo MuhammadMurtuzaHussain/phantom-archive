@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Line, View } from "../api";
+import { codeForChar, press } from "../keys";
 
 /** A line the browser adds itself (command echoes, hints, help). `after` anchors it in the server transcript. */
 export type LocalLine = { after: number; role: "investigator" | "system"; text: string };
@@ -9,7 +10,15 @@ function Typed({ text, live, onOpen }: { text: string; live: boolean; onOpen: (i
   useEffect(() => {
     if (!live || matchMedia("(prefers-reduced-motion: reduce)").matches) { setN(text.length); return; }
     setN(0);
-    const t = setInterval(() => setN((x) => (x >= text.length ? (clearInterval(t), x) : x + 2)), 24);
+    // The ghost types on your keyboard: each tick presses the key for the newest character.
+    let i = 0;
+    const t = setInterval(() => {
+      i = Math.min(text.length, i + 2);
+      const code = codeForChar(text[i - 1] ?? "");
+      if (code) press(code, true);
+      setN(i);
+      if (i >= text.length) clearInterval(t);
+    }, 46);
     return () => clearInterval(t);
   }, [text, live]);
   return n < text.length ? <>{text.slice(0, n)}<span className="caret" /></> : <>{linkify(text, onOpen)}</>;
@@ -26,8 +35,8 @@ function linkify(text: string, onOpen: (id: string) => void): ReactNode[] {
   );
 }
 
-export function Terminal({ view, local, busy, onSubmit, onOpen }: {
-  view: View; local: LocalLine[]; busy: boolean; onSubmit: (raw: string) => void; onOpen: (id: string) => void;
+export function Terminal({ view, local, busy, pending, onSubmit, onOpen }: {
+  view: View; local: LocalLine[]; busy: boolean; pending: string | null; onSubmit: (raw: string) => void; onOpen: (id: string) => void;
 }) {
   const [q, setQ] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -40,6 +49,15 @@ export function Terminal({ view, local, busy, onSubmit, onOpen }: {
   // Braces matter: scrollIntoView returns a Promise in Chrome, and an effect must return nothing.
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [view.transcript.length, local.length, busy]);
   useEffect(() => { if (!busy) input.current?.focus(); }, [busy]);
+  // Typing anywhere goes to the prompt, even after clicking the desk.
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const a = document.activeElement;
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && a !== input.current && !(a instanceof HTMLInputElement)) input.current?.focus();
+    };
+    addEventListener("keydown", k);
+    return () => removeEventListener("keydown", k);
+  }, []);
 
   const row = (l: Line | LocalLine, key: string, live = false) => {
     if (l.role === "system") return <p key={key} className="line-in text-phosphor-dim">{"// "}{linkify(l.text, onOpen)}</p>;
@@ -71,6 +89,7 @@ export function Terminal({ view, local, busy, onSubmit, onOpen }: {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-2" aria-live="polite">
         {rows}
+        {busy && pending && <p className="amber-glow text-amber">{"> "}{pending}</p>}
         {busy && <p className="pt-2 text-phosphor-dim">the Caretaker is answering<span className="caret" /></p>}
         <div ref={end} className="h-2" />
       </div>

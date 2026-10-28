@@ -10,7 +10,7 @@ export function Panel({ open, title, onClose, children }: { open: boolean; title
     <aside
       aria-hidden={!open}
       inert={!open}
-      className={`panel absolute inset-y-0 right-0 z-20 flex w-full flex-col border-l border-phosphor-faint bg-screen px-5 py-5 sm:px-7 lg:w-[min(46%,640px)] ${open ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0"}`}
+      className={`panel absolute inset-y-0 right-0 z-20 flex w-full flex-col border-l border-phosphor-faint bg-screen px-5 py-4 @4xl:w-[min(46%,640px)] ${open ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0"}`}
     >
       <header className="mb-4 flex items-baseline justify-between">
         <h2 className="text-phosphor">{title}</h2>

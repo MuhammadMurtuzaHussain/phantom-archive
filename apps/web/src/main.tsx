@@ -1,11 +1,16 @@
-import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
+import { StrictMode, useCallback, useLayoutEffect, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import "./index.css";
 import { api, type Evidence, type View } from "./api";
 import { Terminal, type LocalLine } from "./components/Terminal";
 import { Claims, Files, Panel, Theory } from "./components/Panels";
 import { Relic } from "./components/Relic";
 import { HELP, hint, parse, relicAwake, stages, type Stage } from "./progress";
+import { clockLabel, setBurned } from "./clock";
+import { isMuted, onMute, powerOn, setMuted } from "./sound";
+import { listenToRealKeyboard } from "./keys";
+import { SCREEN_PX } from "./scene/size";
 
 const KEY = "phantom-archive:session";
 const store = {
@@ -43,15 +48,15 @@ function Boot({ ghost, resumable, onStart }: { ghost: string; resumable: boolean
   }, [ready, resumable, onStart]);
 
   return (
-    <div className="flex h-full flex-col justify-between px-[clamp(1.25rem,6vw,6rem)] py-[clamp(1.5rem,8vh,5rem)]">
+    <div className="flex h-full flex-col justify-between px-[clamp(1.25rem,6cqw,6rem)] py-[clamp(1.25rem,5cqw,4rem)]">
       <div>
-        <h1 className="phosphor text-[clamp(1.6rem,4vw,2.6rem)] font-semibold leading-tight tracking-tight">PHANTOM ARCHIVE</h1>
+        <h1 className="phosphor text-[clamp(1.5rem,4cqw,2.6rem)] font-semibold leading-tight tracking-tight">PHANTOM ARCHIVE</h1>
         <p className="text-phosphor-dim">Case 001: The Vale Archive</p>
-        <div className="mt-10 space-y-0.5 text-[14px]">
+        <div className="mt-6 space-y-0.5 text-[14px]">
           {lines.slice(0, shown).map((l, i) => <p key={i} className="line-in min-h-[1.65em] whitespace-pre text-phosphor/85">{l}</p>)}
         </div>
         {ready && (
-          <div className="line-in mt-8 space-y-1">
+          <div className="line-in mt-6 space-y-1">
             <button onClick={() => onStart(true)} className="amber-glow text-amber hover:underline">&gt; press enter to connect<span className="caret" /></button>
             {resumable && <p><button onClick={() => onStart(false)} className="text-phosphor-dim hover:text-amber">&gt; press r to resume your last case file</button></p>}
           </div>
@@ -69,10 +74,12 @@ function Game() {
   const [reading, setReading] = useState<Evidence | null>(null);
   const [busy, setBusy] = useState(false);
   const [lost, setLost] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
   const [ghost, setGhost] = useState("connecting");
   const announced = useRef<Set<Stage>>(new Set());
   const saved = store.get();
 
+  useEffect(() => { setBurned(view); }, [view]);
   useEffect(() => { api.health().then((h) => setGhost(`${h.ghost.model} on ${h.ghost.home}`)).catch(() => setGhost("model unreachable")); }, []);
 
   const say = useCallback((role: LocalLine["role"], texts: string[], v: View | null = view) => {
@@ -101,6 +108,7 @@ function Game() {
   }, [view, say]);
 
   const start = useCallback(async (fresh: boolean) => {
+    powerOn();
     const v = await run(async () => {
       if (!fresh && saved) { try { return await api.state(saved); } catch { /* the archive restarted */ } }
       return api.newSession();
@@ -142,7 +150,9 @@ function Game() {
   const submit = async (raw: string) => {
     const c = parse(raw);
     if (c.kind === "ask") {
+      setPending(c.text);
       const r = await run(() => api.turn(id, c.text));
+      setPending(null);
       if (r) setView(r.state);
       return;
     }
@@ -185,12 +195,13 @@ function Game() {
 
   return (
     <div className="relative flex h-full">
-      <div className={`flex min-w-0 flex-1 flex-col px-[clamp(1.25rem,6vw,6rem)] pb-4 pt-4 transition-[padding] ${panel ? "lg:pr-[min(48%,660px)]" : ""}`}>
-        <header className="mb-6 flex items-center justify-between text-[13px] text-phosphor-dim">
+      <div className={`flex min-w-0 flex-1 flex-col px-[clamp(1rem,5cqw,6rem)] pb-3 pt-3 transition-[padding] ${panel ? "@4xl:pr-[min(48%,660px)]" : ""}`}>
+        <header className="mb-4 flex items-center justify-between text-[13px] text-phosphor-dim">
           <span>vale archive, node 7</span>
           <span className="flex items-center gap-4">
             {relicAwake(view) && <Relic view={view} busy={busy} onEvent={async (t) => { const v = await run(() => api.relic(id, t)); if (v) setView(v); }} />}
-            <span>shutdown 00:00</span>
+            <span title="The archive shuts down at 00:00">{clockLabel(view)}</span>
+            <SoundToggle />
           </span>
         </header>
         {lost ? (
@@ -199,7 +210,7 @@ function Game() {
             <button onClick={() => start(true)} className="text-amber hover:underline">&gt; open a new case file</button>
           </div>
         ) : (
-          <Terminal view={view} local={local} busy={busy} onSubmit={submit} onOpen={openFile} />
+          <Terminal view={view} local={local} busy={busy} pending={pending} onSubmit={submit} onOpen={openFile} />
         )}
         <nav className="mt-2 flex gap-5 text-[13px] text-phosphor-dim" aria-label="Commands">
           {ORDER.filter((st) => s[st]).map((st) => (
@@ -224,9 +235,9 @@ function Game() {
       </Panel>
 
       {view.ending && (
-        <div className="line-in absolute inset-0 z-40 flex flex-col justify-center bg-screen px-[clamp(1.25rem,8vw,8rem)]">
+        <div className="line-in absolute inset-0 z-40 flex flex-col justify-center bg-screen px-[clamp(1.25rem,8cqw,8rem)]">
           <p className={view.ending.id === "carry" ? "text-marigold" : "text-amber"}>{view.endings.find((x) => x.id === view.ending!.id)?.title}</p>
-          <p className={`mt-6 max-w-[60ch] font-hand text-[clamp(1.3rem,2.4vw,1.75rem)] leading-snug ${view.ending.id === "carry" ? "text-[#ffdcae]" : "text-phosphor"}`}>{view.ending.text}</p>
+          <p className={`mt-6 max-w-[60ch] font-hand text-[clamp(1.2rem,2.6cqw,1.75rem)] leading-snug ${view.ending.id === "carry" ? "text-[#ffdcae]" : "text-phosphor"}`}>{view.ending.text}</p>
           <button onClick={() => start(true)} className="mt-12 w-fit text-[13px] text-phosphor-dim hover:text-amber">&gt; open a new case file</button>
         </div>
       )}
@@ -234,11 +245,50 @@ function Game() {
   );
 }
 
+function SoundToggle() {
+  const [muted, set] = useState(isMuted());
+  useEffect(() => onMute(set), []);
+  return <button onClick={() => setMuted(!muted)} className="hover:text-amber">{muted ? "sound off" : "sound on"}</button>;
+}
+
+function webgl() {
+  try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; }
+}
+
 function Monitor() {
+  const flat = innerWidth < 820 || new URLSearchParams(location.search).has("flat") || !webgl();
+  useEffect(() => { listenToRealKeyboard(); }, []);
+  if (flat) {
+    return (
+      <main className="h-full p-[clamp(0px,1.2vw,14px)]">
+        <div className="screen power-on @container h-full"><Game /></div>
+      </main>
+    );
+  }
+  return <DeskView />;
+}
+
+/** The 3D desk. The game renders through a portal into a node that sits on the CRT's glass. */
+function DeskView() {
+  const room = useRef<HTMLDivElement>(null);
+  const [glass] = useState(() => {
+    const el = document.createElement("div");
+    el.style.width = `${SCREEN_PX.w}px`;
+    el.style.height = `${SCREEN_PX.h}px`;
+    return el;
+  });
+  // three.js loads only here, so the flat CRT on phones never downloads it.
+  useLayoutEffect(() => {
+    let off: (() => void) | undefined;
+    let gone = false;
+    void import("./scene/desk").then(({ mountDesk }) => { if (!gone) off = mountDesk(room.current!, glass); });
+    return () => { gone = true; off?.(); };
+  }, [glass]);
   return (
-    <main className="h-full p-[clamp(0px,1.2vw,14px)]">
-      <div className="screen power-on h-full"><Game /></div>
-    </main>
+    <>
+      <div ref={room} className="fixed inset-0 bg-[#050504]" />
+      {createPortal(<div className="screen @container h-full text-[15px]"><Game /></div>, glass)}
+    </>
   );
 }
 

@@ -2,10 +2,25 @@
   "name": "@phantom/web",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@phantom/case-engine": "workspace:*", "react": "^19.3.1", "react-dom": "^19.3.1" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phantom/case-engine": "workspace:*",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.186.1"
+  },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3", "@types/react": "^19.2.0", "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^6.0.0", "tailwindcss": "^4.3.3", "typescript": "^5.9.3", "vite": "^8.3.5"
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5"
   }
 }

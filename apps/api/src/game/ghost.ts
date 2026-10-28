@@ -83,7 +83,8 @@ export async function ghostTurn(s: Session, message: string) {
     const claims = recordClaims(s, turn.claims, "turn");
     s.transcript.push({ role: "ghost", text: turn.reply, at: now(), source: "model", claims: claims.map((c) => c.id) });
     if (stripped.length) {
-      s.transcript.push({ role: "system", text: `${stripped.length} claim${stripped.length > 1 ? "s" : ""} withheld: cited evidence that is missing or not yet found (${stripped.flatMap((x) => x.bad).join(", ")}).`, at: now() });
+      const what = stripped.length > 1 ? `${stripped.length} things` : "something";
+      s.transcript.push({ role: "system", text: `The Caretaker said ${what} it could not back with a file you have found. It was struck from the record.`, at: now() });
     }
     // The tell is code's, not the model's: restating a lie always shows on the relic.
     const restated = turn.claims.some((c) => c.citations.length === 1 && c.citations[0] === "EV-002") && standingLies(vale, s.state).length > 0;
