@@ -9,6 +9,9 @@ import { challengeWorkflow } from "../agent/challenge.ts";
 // Mastra dashboard when MASTRA_PLATFORM_ACCESS_TOKEN and MASTRA_PROJECT_ID are
 // set. Without them the exporter does nothing.
 export const mastra = new Mastra({
+  // The platform's trace views are scoped to an environment, and traces with
+  // none don't appear in them. The project's one environment is production.
+  environment: process.env.MASTRA_ENVIRONMENT ?? "production",
   agents: { caretaker },
   workflows: { challengeWorkflow },
   observability: new Observability({

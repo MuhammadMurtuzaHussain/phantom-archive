@@ -36,7 +36,7 @@ const speakStep = createStep({
   description: "The Caretaker concedes, or holds its ground, in its own words",
   inputSchema: judged,
   outputSchema: spoken,
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, tracingContext }) => {
     const s = must(inputData.sessionId);
     const lie = vale.lies.find((l) => l.id === inputData.lieId)!;
     const titles = inputData.cited.map((id) => `${id} "${vale.evidence.find((e) => e.id === id)?.title ?? "?"}"`).join(", ");
@@ -44,7 +44,7 @@ const speakStep = createStep({
       ? `The investigator confronts you with ${titles}. It breaks your claim "${lie.claim}". You cannot keep it. Concede now, in character, in under 70 words: ${lie.concession} Read ${inputData.breaker} with your tool and cite it. face "grief".`
       : `The investigator challenges your claim "${lie.claim}" with ${titles || "no evidence"}. Nothing they cited contradicts it. Hold your ground calmly in under 50 words and cite EV-002. face "lying".`;
     try {
-      const { turn } = await speak(s, prompt, false);
+      const { turn } = await speak(s, prompt, false, tracingContext);
       return { ...inputData, reply: turn.reply, claims: turn.claims, face: turn.face, source: "model" as const };
     } catch {
       const reply = inputData.landed ? lie.concession.replace(/\byou\b/gi, "I").replace(/\byour\b/gi, "my") : `${lie.claim} Nothing you have shown me says otherwise.`;

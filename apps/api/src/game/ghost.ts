@@ -1,4 +1,5 @@
 import { GhostTurn, ask, checkCitations, elapsed, standingLies } from "@phantom/case-engine";
+import type { TracingContext } from "@mastra/core/observability";
 import { RequestContext } from "@mastra/core/request-context";
 import { caretaker } from "../agent/caretaker.ts";
 import { noThinking } from "../agent/model.ts";
@@ -17,7 +18,8 @@ function extractJson(text: string): unknown {
 }
 
 /** One Gemma turn, validated. Throws if the model is unreachable or returns nothing usable. */
-export async function speak(s: Session, prompt: string, history = true) {
+/** `tracingContext` nests the turn inside a caller's trace, e.g. the challenge workflow's. */
+export async function speak(s: Session, prompt: string, history = true, tracingContext?: TracingContext) {
   const past = history
     ? s.transcript.slice(-8).filter((l) => l.role !== "system").map((l) => (l.role === "ghost" ? { role: "assistant" as const, content: l.text } : { role: "user" as const, content: l.text }))
     : [];
@@ -28,6 +30,7 @@ export async function speak(s: Session, prompt: string, history = true) {
     providerOptions: noThinking,
     abortSignal: AbortSignal.timeout(TURN_TIMEOUT_MS),
     requestContext,
+    tracingContext,
     // Traces in the Mastra dashboard can be filtered by game session and by the archive's clock.
     tracingOptions: { metadata: { sessionId: s.id, elapsed: elapsed(vale, s.state), unlocked: s.state.unlocked.length } },
   });

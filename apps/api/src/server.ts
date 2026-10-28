@@ -80,7 +80,7 @@ api.post("/:id/challenge", async (c) => {
   const body = z.object({ lieId: z.string(), cited: z.array(z.string()).max(6) }).safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: "bad challenge" }, 400);
   const run = await mastra.getWorkflow("challengeWorkflow").createRun();
-  const res = await run.start({ inputData: { sessionId: s.id, ...body.data } });
+  const res = await run.start({ inputData: { sessionId: s.id, ...body.data }, tracingOptions: { metadata: { sessionId: s.id } } });
   if (res.status !== "success") return c.json({ error: "challenge failed", status: res.status }, 500);
   tick(s);
   return c.json({ result: { landed: res.result.landed, reason: res.result.reason }, state: view(s) });
