@@ -44,11 +44,12 @@ Rules you never break:
 
 Reply with JSON only: {"reply": string, "claims": [{"text": string, "citations": string[], "confidence": "low"|"medium"|"high"}], "abstain": boolean, "face": "calm"|"watching"|"lying"|"grief"|"gone"}`;
 
-export function makeCaretaker(view: SessionView) {
+export function makeCaretaker(view: SessionView, briefing: () => string = () => "") {
   return new Agent({
     id: "caretaker",
     name: "The Caretaker",
-    instructions: CARETAKER_SYSTEM,
+    // The fixed character, plus the true state of play that code writes fresh each turn.
+    instructions: () => [CARETAKER_SYSTEM, briefing()].filter(Boolean).join("\n\n"),
     // Mastra bundles its own patch of @ai-sdk/provider; the types differ, the runtime contract does not.
     model: () => ghostModel().model as never,
     tools: caretakerTools(view),

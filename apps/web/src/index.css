@@ -1,11 +1,61 @@
 @import "tailwindcss";
 
 @theme {
-  --color-void: #07090a;
+  --color-void: #060807;
+  --color-panel: #0b100e;
+  --color-line: #1a2a23;
   --color-phosphor: #8cffb0;
+  --color-phosphor-dim: #4c8a63;
   --color-amber: #ffb547;
   --color-marigold: #ff8a1f;
+  --color-violet: #b9a2ff;
+  --color-blood: #ff6b6b;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-letter: "Cormorant Garamond", Georgia, serif;
 }
 
-body { @apply bg-void text-phosphor font-mono; }
+html, body, #root { height: 100%; }
+body {
+  @apply bg-void text-phosphor font-mono antialiased;
+  font-size: 14px;
+}
+
+/* Layers: the three sources of truth, always the same colour everywhere. */
+.layer-physical { --layer: var(--color-marigold); }
+.layer-digital { --layer: var(--color-phosphor); }
+.layer-interpretation { --layer: var(--color-violet); }
+
+.glow { text-shadow: 0 0 6px color-mix(in srgb, currentColor 55%, transparent); }
+
+/* CRT: scanlines and a slow vignette breathe. Off for reduced motion. */
+.crt::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background:
+    repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 55%, rgb(0 0 0 / 0.55) 100%);
+  z-index: 50;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .crt::after { animation: breathe 7s ease-in-out infinite; }
+  .flicker { animation: flicker 4.5s steps(1) infinite; }
+}
+@keyframes breathe { 50% { opacity: 0.82; } }
+@keyframes flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: 0.6; } 98% { opacity: 0.9; } }
+
+.caret::after {
+  content: "▌";
+  margin-left: 2px;
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+::selection { background: var(--color-phosphor); color: var(--color-void); }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--color-line); }
+
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.4; }
+:focus-visible { outline: 1px solid var(--color-amber); outline-offset: 2px; }

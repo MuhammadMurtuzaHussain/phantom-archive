@@ -177,8 +177,9 @@ phantom-archive/            (new public repo, MIT)
 |---|---|---|
 | **0 · Foundations** | Repo, MIT license, Entire hooks, monorepo (web, api, case-engine, oracle), model adapter, Mastra Caretaker with tools, smoke test 9/10 on Gemma 4 E4B, citation validator with tests, web → API → Gemma round trip | ✅ |
 | **1 · The case** | Case 001 ([story bible](case-001.md)): 24 evidence items, `telemetry.csv` (1,464 hourly rows, 264 unlabelled), 2 lies, 3-question theory, 4 endings. Pure case engine with 6 playthrough tests | ✅ |
-| **2 · The ghost** | `/api/turn` and the challenge workflow. Claims Ledger. Full CRT UI: terminal, Evidence Browser, Timeline, Board. Simulated relic | next |
-| **3 · The oracle** | TabPFN, z-score and IsolationForest on a DO CPU Droplet. Anomaly Scan in the UI | |
+| **2 · The ghost** | Session API, ghost turns with a code-written briefing, citation checks and a scripted fallback. Mastra challenge workflow (judge → speak → record). Claims Ledger. CRT UI: terminal, evidence (timeline order), ledger with challenges, theory and board, endings, simulated relic. A z-score fallback scan | ✅ |
+| **3 · The oracle** (next) | | |
+| **3 · The oracle** (plan) | TabPFN, z-score and IsolationForest on a DO CPU Droplet. Anomaly Scan in the UI | |
 | **4 · Hosting** | `render.yaml`, live Gemma tier, GPU Droplet with vLLM for eval and filming | |
 | **5 · The relic** | UNO Q bridge: faces, boot, warmth, heartbeat. Gemma E2B on the board for the finale | |
 | **6 · The extras** | Atlas and EmbeddingGemma, ElevenLabs, Sentry, Temporal, Browserbase and `.tech`, Auth0 consent, the Tinker Inquisitor | |
