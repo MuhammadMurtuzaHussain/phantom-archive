@@ -1,61 +1,70 @@
 @import "tailwindcss";
 
+/*
+ * One monitor, one phosphor. Base text is green; the investigator's own voice
+ * and everything you can act on is amber (the single accent). Marigold is
+ * reserved for the physical world: the relic, and the ending it leads to.
+ */
 @theme {
-  --color-void: #060807;
-  --color-panel: #0b100e;
-  --color-line: #1a2a23;
-  --color-phosphor: #8cffb0;
-  --color-phosphor-dim: #4c8a63;
-  --color-amber: #ffb547;
-  --color-marigold: #ff8a1f;
-  --color-violet: #b9a2ff;
-  --color-blood: #ff6b6b;
+  --color-bezel: #030403;
+  --color-screen: #070b09;
+  --color-phosphor: #9df5b8;
+  --color-phosphor-dim: #4f7d60;
+  --color-phosphor-faint: #1c2c23;
+  --color-amber: #ffbf5e;
+  --color-marigold: #ff9a3c;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --font-letter: "Cormorant Garamond", Georgia, serif;
+  --font-hand: "Cormorant Garamond", Georgia, serif;
 }
 
 html, body, #root { height: 100%; }
 body {
-  @apply bg-void text-phosphor font-mono antialiased;
-  font-size: 14px;
+  @apply bg-bezel font-mono text-phosphor antialiased;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
-/* Layers: the three sources of truth, always the same colour everywhere. */
-.layer-physical { --layer: var(--color-marigold); }
-.layer-digital { --layer: var(--color-phosphor); }
-.layer-interpretation { --layer: var(--color-violet); }
-
-.glow { text-shadow: 0 0 6px color-mix(in srgb, currentColor 55%, transparent); }
-
-/* CRT: scanlines and a slow vignette breathe. Off for reduced motion. */
-.crt::after {
+/* The glass: rounded like a tube, a vignette at the edges, faint scanlines. */
+.screen {
+  position: relative;
+  background: radial-gradient(ellipse 120% 90% at 50% 45%, #0b120e 0%, var(--color-screen) 60%, #040605 100%);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: inset 0 0 120px rgb(0 0 0 / 0.75), inset 0 0 0 1px #0f1813;
+}
+.screen::after {
   content: "";
   pointer-events: none;
-  position: fixed;
+  position: absolute;
   inset: 0;
-  background:
-    repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 1px, transparent 1px 3px),
-    radial-gradient(ellipse at center, transparent 55%, rgb(0 0 0 / 0.55) 100%);
-  z-index: 50;
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.18) 0 1px, transparent 1px 3px);
+  z-index: 30;
 }
-@media (prefers-reduced-motion: no-preference) {
-  .crt::after { animation: breathe 7s ease-in-out infinite; }
-  .flicker { animation: flicker 4.5s steps(1) infinite; }
-}
-@keyframes breathe { 50% { opacity: 0.82; } }
-@keyframes flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: 0.6; } 98% { opacity: 0.9; } }
 
-.caret::after {
-  content: "▌";
-  margin-left: 2px;
-  animation: blink 1s steps(1) infinite;
-}
+.phosphor { text-shadow: 0 0 5px rgb(157 245 184 / 0.35); }
+.amber-glow { text-shadow: 0 0 5px rgb(255 191 94 / 0.3); }
+
+.caret::after { content: "\2588"; margin-left: 1px; animation: blink 1.05s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
-::selection { background: var(--color-phosphor); color: var(--color-void); }
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-thumb { background: var(--color-line); }
+@media (prefers-reduced-motion: no-preference) {
+  .power-on { animation: power-on 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .line-in { animation: line-in 260ms ease-out both; }
+}
+@keyframes power-on {
+  0% { transform: scaleY(0.004) scaleX(0.6); filter: brightness(3); }
+  45% { transform: scaleY(0.004) scaleX(1); filter: brightness(2); }
+  100% { transform: none; filter: none; }
+}
+@keyframes line-in { from { opacity: 0; } to { opacity: 1; } }
 
+.panel { transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
+
+::selection { background: var(--color-phosphor); color: var(--color-screen); }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--color-phosphor-faint); }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.4; }
-:focus-visible { outline: 1px solid var(--color-amber); outline-offset: 2px; }
+button:focus-visible { outline: 1px dashed var(--color-amber); outline-offset: 3px; }
+input { caret-color: var(--color-amber); }

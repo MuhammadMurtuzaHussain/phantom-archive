@@ -1,85 +1,107 @@
-import { useEffect, useRef, useState } from "react";
-import type { Claim, Line, View } from "../api";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { Line, View } from "../api";
 
-/** Types out the newest ghost line, once. */
-function Typed({ text, live }: { text: string; live: boolean }) {
+/** A line the browser adds itself (command echoes, hints, help). `after` anchors it in the server transcript. */
+export type LocalLine = { after: number; role: "investigator" | "system"; text: string };
+
+function Typed({ text, live, onOpen }: { text: string; live: boolean; onOpen: (id: string) => void }) {
   const [n, setN] = useState(live ? 0 : text.length);
   useEffect(() => {
     if (!live || matchMedia("(prefers-reduced-motion: reduce)").matches) { setN(text.length); return; }
     setN(0);
-    const t = setInterval(() => setN((x) => (x >= text.length ? (clearInterval(t), x) : x + 2)), 22);
+    const t = setInterval(() => setN((x) => (x >= text.length ? (clearInterval(t), x) : x + 2)), 24);
     return () => clearInterval(t);
   }, [text, live]);
-  return <span className={n < text.length ? "caret" : ""}>{text.slice(0, n)}</span>;
+  return n < text.length ? <>{text.slice(0, n)}<span className="caret" /></> : <>{linkify(text, onOpen)}</>;
 }
 
-function ClaimChip({ c, onOpen }: { c: Claim; onOpen: (id: string) => void }) {
-  return (
-    <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[12px]">
-      <span className="text-phosphor-dim">{c.id}</span>
-      <span className={c.status === "revised" ? "line-through text-blood/70" : "opacity-80"}>{c.text}</span>
-      {c.citations.map((id) => (
-        <button key={id} onClick={() => onOpen(id)} className="border border-line px-1.5 text-amber hover:border-amber">
-          {id}
-        </button>
-      ))}
-      <span className="text-phosphor-dim">{c.confidence}</span>
-    </div>
+/** EV ids inside any line become links. */
+function linkify(text: string, onOpen: (id: string) => void): ReactNode[] {
+  return text.split(/(EV-(?:R-)?\d{3})/g).map((part, i) =>
+    /^EV-/.test(part) ? (
+      <button key={i} onClick={() => onOpen(part)} className="text-amber underline decoration-amber/40 underline-offset-4 hover:decoration-amber">{part}</button>
+    ) : (
+      part
+    ),
   );
 }
 
-export function Terminal({ view, busy, onAsk, onOpen }: { view: View; busy: boolean; onAsk: (q: string) => void; onOpen: (id: string) => void }) {
+export function Terminal({ view, local, busy, onSubmit, onOpen }: {
+  view: View; local: LocalLine[]; busy: boolean; onSubmit: (raw: string) => void; onOpen: (id: string) => void;
+}) {
   const [q, setQ] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
+  const [h, setH] = useState(-1);
   const end = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
   const claims = new Map(view.ledger.map((c) => [c.id, c]));
   const lastGhost = view.transcript.findLastIndex((l) => l.role === "ghost");
 
-  // Braces matter: scrollIntoView now returns a Promise in Chrome, and an effect must return nothing.
-  useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [view.transcript.length, busy]);
+  // Braces matter: scrollIntoView returns a Promise in Chrome, and an effect must return nothing.
+  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [view.transcript.length, local.length, busy]);
+  useEffect(() => { if (!busy) input.current?.focus(); }, [busy]);
 
-  const say = (l: Line, i: number) => {
-    if (l.role === "system") return <p key={i} className="text-[12px] text-amber/70">// {l.text}</p>;
-    if (l.role === "investigator") return <p key={i} className="text-amber"><span className="opacity-60">&gt; </span>{l.text}</p>;
+  const row = (l: Line | LocalLine, key: string, live = false) => {
+    if (l.role === "system") return <p key={key} className="line-in text-phosphor-dim">{"// "}{linkify(l.text, onOpen)}</p>;
+    if (l.role === "investigator") return <p key={key} className="line-in amber-glow text-amber">{"> "}{l.text}</p>;
+    const g = l as Line;
+    const cites = [...new Set(g.claims?.flatMap((id) => claims.get(id)?.citations ?? []) ?? [])];
     return (
-      <div key={i} className="glow">
-        <p className="text-[15px] leading-relaxed"><Typed text={l.text} live={i === lastGhost} /></p>
-        {l.source === "scripted" && <p className="text-[11px] text-phosphor-dim">scripted line, not the model</p>}
-        {l.claims?.map((id) => claims.get(id)).filter(Boolean).map((c) => <ClaimChip key={c!.id} c={c!} onOpen={onOpen} />)}
+      <div key={key} className="phosphor">
+        <p className="max-w-[68ch]"><Typed text={g.text} live={live} onOpen={onOpen} /></p>
+        {(cites.length > 0 || g.source === "scripted") && (
+          <p className="mt-1 text-[13px] text-phosphor-dim">
+            {cites.length > 0 && <>cites {cites.map((id, i) => <span key={id}>{i > 0 && ", "}{linkify(id, onOpen)}</span>)}</>}
+            {g.source === "scripted" && <span>{cites.length ? "  " : ""}(scripted line, the model did not answer)</span>}
+          </p>
+        )}
       </div>
     );
   };
 
+  const rows: ReactNode[] = [];
+  const localAt = (n: number) => local.filter((x) => x.after === n).forEach((x, j) => rows.push(row(x, `l${n}-${j}`)));
+  localAt(0);
+  view.transcript.forEach((l, i) => {
+    rows.push(<div key={`t${i}`} className={l.role === "ghost" ? "pt-2" : ""}>{row(l, `r${i}`, i === lastGhost)}</div>);
+    localAt(i + 1);
+  });
+
   return (
-    <section className="flex min-h-0 flex-1 flex-col border border-line bg-panel/60">
-      <header className="flex items-center justify-between border-b border-line px-4 py-2 text-[11px] tracking-[0.2em] text-phosphor-dim">
-        <span>CARETAKER · NODE 7</span>
-        <span>{busy ? "the archive is thinking…" : "listening"}</span>
-      </header>
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5" aria-live="polite">
-        {view.transcript.map(say)}
-        {busy && <p className="caret text-phosphor-dim" />}
-        <div ref={end} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-2" aria-live="polite">
+        {rows}
+        {busy && <p className="pt-2 text-phosphor-dim">the Caretaker is answering<span className="caret" /></p>}
+        <div ref={end} className="h-2" />
       </div>
       <form
-        className="flex items-center gap-2 border-t border-line px-4 py-3"
+        className="mt-3 flex items-center gap-2 border-t border-phosphor-faint pt-3"
         onSubmit={(e) => {
           e.preventDefault();
           if (!q.trim() || busy) return;
-          onAsk(q.trim());
+          onSubmit(q.trim());
+          setHistory((x) => [q.trim(), ...x].slice(0, 30));
+          setH(-1);
           setQ("");
         }}
       >
-        <span className="text-amber">&gt;</span>
+        <span className="amber-glow text-amber">&gt;</span>
         <input
+          ref={input}
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowUp" && history.length) { e.preventDefault(); const n = Math.min(h + 1, history.length - 1); setH(n); setQ(history[n]!); }
+            if (e.key === "ArrowDown") { e.preventDefault(); const n = h - 1; setH(n); setQ(n >= 0 ? history[n]! : ""); }
+          }}
           disabled={busy || !!view.ending}
-          placeholder="ask the Caretaker…"
-          aria-label="Ask the Caretaker"
-          className="flex-1 bg-transparent text-amber outline-none placeholder:text-phosphor-dim/60"
+          aria-label="Type a question or a command"
+          autoComplete="off"
+          spellCheck={false}
+          className="amber-glow flex-1 bg-transparent text-amber outline-none placeholder:text-phosphor-dim focus-visible:outline-none"
+          placeholder={busy ? "" : "ask, or type help"}
         />
-        <button disabled={busy || !q.trim()} className="text-[11px] tracking-widest text-amber">ASK</button>
       </form>
-    </section>
+    </div>
   );
 }

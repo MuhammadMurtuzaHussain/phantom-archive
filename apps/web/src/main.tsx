@@ -1,148 +1,245 @@
-import { StrictMode, useCallback, useEffect, useState } from "react";
+import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { api, type Evidence, type View } from "./api";
-import { Terminal } from "./components/Terminal";
-import { EvidencePanel } from "./components/EvidencePanel";
-import { LedgerPanel } from "./components/LedgerPanel";
-import { TheoryPanel } from "./components/TheoryPanel";
+import { Terminal, type LocalLine } from "./components/Terminal";
+import { Claims, Files, Panel, Theory } from "./components/Panels";
 import { Relic } from "./components/Relic";
+import { HELP, hint, parse, relicAwake, stages, type Stage } from "./progress";
 
 const KEY = "phantom-archive:session";
 const store = {
   get: () => { try { return localStorage.getItem(KEY); } catch { return null; } },
   set: (id: string) => { try { localStorage.setItem(KEY, id); } catch { /* private window: no resume */ } },
 };
+type PanelName = "files" | "claims" | "theory";
+const ORDER: Stage[] = ["files", "claims", "theory"];
 
-type Tab = "evidence" | "ledger" | "theory";
+function Boot({ ghost, resumable, onStart }: { ghost: string; resumable: boolean; onStart: (fresh: boolean) => void }) {
+  const lines = [
+    "PORT ARDEE RECORDS OFFICE, remote session",
+    "connecting to VALE MEMORIAL ARCHIVE, node 7 ...",
+    "link established   31 OCT 2049  09:12",
+    "archive shutdown   01 NOV 2049  00:00",
+    "",
+    "operator I. VALE   unreachable since 30 OCT",
+    `caretaker process  running (${ghost})`,
+  ];
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { setShown(lines.length); return; }
+    const t = setInterval(() => setShown((n) => (n >= lines.length ? (clearInterval(t), n) : n + 1)), 320);
+    return () => clearInterval(t);
+  }, [lines.length]);
+  const ready = shown >= lines.length;
+  useEffect(() => {
+    if (!ready) return;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === "Enter") onStart(true);
+      if ((e.key === "r" || e.key === "R") && resumable) onStart(false);
+    };
+    addEventListener("keydown", k);
+    return () => removeEventListener("keydown", k);
+  }, [ready, resumable, onStart]);
 
-function Title({ onEnter, resumable }: { onEnter: (fresh: boolean) => void; resumable: boolean }) {
   return (
-    <main className="crt grid min-h-full place-items-center p-4">
-      <div className="w-full max-w-xl">
-        <p className="text-[11px] tracking-[0.3em] text-amber">PORT ARDEE RECORDS OFFICE · 31 OCT 2049</p>
-        <h1 className="glow flicker mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">PHANTOM ARCHIVE</h1>
-        <p className="mt-2 text-phosphor-dim">Case 001: The Vale Archive</p>
-        <div className="mt-8 space-y-2 text-[13px] leading-relaxed text-phosphor/85">
-          <p>The operator is missing. The archive shuts down at midnight. Something inside it is still talking.</p>
-          <p className="text-phosphor-dim">Question the Caretaker. Read what it can't hide. Pin evidence, catch its lies, and decide what becomes of it.</p>
+    <div className="flex h-full flex-col justify-between px-[clamp(1.25rem,6vw,6rem)] py-[clamp(1.5rem,8vh,5rem)]">
+      <div>
+        <h1 className="phosphor text-[clamp(1.6rem,4vw,2.6rem)] font-semibold leading-tight tracking-tight">PHANTOM ARCHIVE</h1>
+        <p className="text-phosphor-dim">Case 001: The Vale Archive</p>
+        <div className="mt-10 space-y-0.5 text-[14px]">
+          {lines.slice(0, shown).map((l, i) => <p key={i} className="line-in min-h-[1.65em] whitespace-pre text-phosphor/85">{l}</p>)}
         </div>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <button onClick={() => onEnter(true)} className="border border-amber px-4 py-2 tracking-[0.2em] text-amber hover:bg-amber/10">ENTER THE ARCHIVE</button>
-          {resumable && <button onClick={() => onEnter(false)} className="border border-line px-4 py-2 tracking-[0.2em] text-phosphor-dim hover:border-phosphor-dim">RESUME</button>}
-        </div>
-        <p className="mt-10 text-[11px] text-phosphor-dim">All people, places and events are fictional. The ghost is Gemma, an open-weight model.</p>
+        {ready && (
+          <div className="line-in mt-8 space-y-1">
+            <button onClick={() => onStart(true)} className="amber-glow text-amber hover:underline">&gt; press enter to connect<span className="caret" /></button>
+            {resumable && <p><button onClick={() => onStart(false)} className="text-phosphor-dim hover:text-amber">&gt; press r to resume your last case file</button></p>}
+          </div>
+        )}
       </div>
-    </main>
-  );
-}
-
-function Ending({ view, onRestart }: { view: View; onRestart: () => void }) {
-  const e = view.ending!;
-  const carry = e.id === "carry";
-  return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-void/95 p-6">
-      <div className="max-w-xl">
-        <p className={`text-[11px] tracking-[0.3em] ${carry ? "text-marigold" : "text-amber"}`}>{view.endings.find((x) => x.id === e.id)?.title.toUpperCase()}</p>
-        <p className={`glow mt-6 font-letter text-2xl leading-snug ${carry ? "text-[#ffd9a8]" : "text-phosphor"}`}>{e.text}</p>
-        <button onClick={onRestart} className="mt-10 border border-line px-4 py-2 text-[12px] tracking-[0.2em] text-phosphor-dim hover:border-phosphor-dim">OPEN A NEW CASE FILE</button>
-      </div>
+      <p className="text-[12px] text-phosphor-dim">Every person, place and event here is fictional. The Caretaker is Gemma, an open-weight model.</p>
     </div>
   );
 }
 
 function Game() {
   const [view, setView] = useState<View | null>(null);
-  const [entered, setEntered] = useState(false);
+  const [local, setLocal] = useState<LocalLine[]>([]);
+  const [panel, setPanel] = useState<PanelName | null>(null);
+  const [reading, setReading] = useState<Evidence | null>(null);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState<Evidence | null>(null);
-  const [tab, setTab] = useState<Tab>("evidence");
-  const [ghost, setGhost] = useState("…");
-  const [err, setErr] = useState<string | null>(null);
+  const [lost, setLost] = useState(false);
+  const [ghost, setGhost] = useState("connecting");
+  const announced = useRef<Set<Stage>>(new Set());
   const saved = store.get();
 
-  useEffect(() => { api.health().then((h) => setGhost(`${h.ghost.model} @ ${h.ghost.home}`)).catch(() => setGhost("unreachable")); }, []);
+  useEffect(() => { api.health().then((h) => setGhost(`${h.ghost.model} on ${h.ghost.home}`)).catch(() => setGhost("model unreachable")); }, []);
+
+  const say = useCallback((role: LocalLine["role"], texts: string[], v: View | null = view) => {
+    const after = v?.transcript.length ?? 0;
+    setLocal((x) => [...x, ...texts.map((text) => ({ after, role, text }))]);
+  }, [view]);
 
   const run = useCallback(async <T,>(fn: () => Promise<T>) => {
     setBusy(true);
-    setErr(null);
-    try { return await fn(); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
-  }, []);
+    try { return await fn(); } catch (e) {
+      if (/no such session/.test((e as Error).message)) setLost(true);
+      else say("system", [`error: ${(e as Error).message.slice(0, 160)}`]);
+    } finally { setBusy(false); }
+  }, [say]);
 
-  const enter = async (fresh: boolean) => {
+  // Teach each new part of the game once, the moment it opens up.
+  useEffect(() => {
+    if (!view) return;
+    const s = stages(view);
+    for (const st of ORDER) {
+      if (s[st] && !announced.current.has(st)) {
+        announced.current.add(st);
+        say("system", hint(st, view), view);
+      }
+    }
+  }, [view, say]);
+
+  const start = useCallback(async (fresh: boolean) => {
     const v = await run(async () => {
-      if (!fresh && saved) { try { return await api.state(saved); } catch { /* server restarted: start over */ } }
+      if (!fresh && saved) { try { return await api.state(saved); } catch { /* the archive restarted */ } }
       return api.newSession();
     });
     if (!v) return;
     store.set(v.id);
+    const s = stages(v);
+    announced.current = new Set(ORDER.filter((st) => s[st]));
+    setLocal(s.files ? [] : [{ after: 1, role: "system", text: "Ask it anything. Type a question and press enter." }]);
+    setPanel(null);
+    setReading(null);
+    setLost(false);
     setView(v);
-    setOpen(null);
-    setEntered(true);
+  }, [run, saved]);
+
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") { setPanel(null); setReading(null); } };
+    addEventListener("keydown", k);
+    return () => removeEventListener("keydown", k);
+  }, []);
+
+  if (!view) return <Boot ghost={ghost} resumable={!!saved} onStart={start} />;
+  const id = view.id;
+  const s = stages(view);
+
+  const openFile = async (eid: string) => {
+    const r = await run(() => api.read(id, eid));
+    if (!r) return;
+    setView(r.state);
+    setReading(r.evidence);
+    setPanel("files");
+  };
+  const challenge = async (lie: string, cited: string[]) => {
+    setPanel(null);
+    const r = await run(() => api.challenge(id, lie, cited));
+    if (r) setView(r.state);
   };
 
-  if (!entered || !view) return <Title onEnter={enter} resumable={!!saved} />;
-  const id = view.id;
-  const openEvidence = async (eid: string) => {
-    const r = await run(() => api.read(id, eid));
-    if (r) { setOpen(r.evidence); setView(r.state); setTab("evidence"); }
+  const submit = async (raw: string) => {
+    const c = parse(raw);
+    if (c.kind === "ask") {
+      const r = await run(() => api.turn(id, c.text));
+      if (r) setView(r.state);
+      return;
+    }
+    say("investigator", [raw]);
+    switch (c.kind) {
+      case "help":
+        say("system", [...HELP.start, ...ORDER.filter((st) => s[st]).flatMap((st) => HELP[st])]);
+        return;
+      case "panel":
+        setReading(null);
+        setPanel(c.panel);
+        return;
+      case "open":
+        if (!view.evidence.some((e) => e.id === c.id)) return say("system", [`${c.id} has not been recovered yet.`]);
+        return openFile(c.id);
+      case "pin": {
+        if (!view.evidence.some((e) => e.id === c.id)) return say("system", [`${c.id} has not been recovered yet.`]);
+        const v = await run(() => api.pin(id, c.id));
+        if (v) { setView(v); say("system", [`${c.id} ${v.evidence.find((e) => e.id === c.id)?.pinned ? "pinned as evidence" : "unpinned"}.`], v); }
+        return;
+      }
+      case "challenge":
+        if (!c.cited.length) return say("system", [`Challenge ${c.lie} with what? For example: challenge ${c.lie} EV-005`]);
+        return challenge(c.lie, c.cited);
+      case "scan": {
+        const v = await run(() => api.scan(id));
+        if (v) { setView(v); say("system", ["Scan filed as EV-012."], v); }
+        return;
+      }
+      case "relic": {
+        const v = await run(() => api.relic(id, c.type));
+        if (v) setView(v);
+        return;
+      }
+    }
   };
-  const unread = view.evidence.filter((e) => !e.read).length;
-  const standing = view.lies.filter((l) => l.standing).length;
+
+  const titles: Record<PanelName, string> = { files: "files", claims: "the Caretaker's claims", theory: "theory" };
+  const pin = async (eid: string) => { const v = await run(() => api.pin(id, eid)); if (v) setView(v); };
 
   return (
-    <main className="crt flex h-full flex-col gap-3 p-3 sm:p-4">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-[11px] tracking-[0.2em]">
-        <span className="glow text-[13px] text-phosphor">PHANTOM ARCHIVE</span>
-        <span className="text-amber">VALE ARCHIVE · 31 OCT 2049 · SHUTDOWN 00:00</span>
-        <span className="text-phosphor-dim">ghost: {ghost}</span>
-      </header>
-      {err && (
-        <p role="alert" className="flex items-center justify-between gap-3 border border-blood/50 px-3 py-1.5 text-[12px] text-blood">
-          {/no such session/.test(err) ? "The archive restarted and this case file was lost." : err}
-          {/no such session/.test(err) && <button onClick={() => enter(true)} className="border border-blood/60 px-2 py-0.5 tracking-widest">OPEN A NEW CASE FILE</button>}
-        </p>
-      )}
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-        <div className="flex min-h-[60vh] flex-col gap-3 lg:min-h-0">
-          <Terminal view={view} busy={busy} onAsk={async (q) => { const r = await run(() => api.turn(id, q)); if (r) setView(r.state); }} onOpen={openEvidence} />
-          <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
-            <Relic view={view} busy={busy} onEvent={async (t) => { const v = await run(() => api.relic(id, t)); if (v) setView(v); }} />
-            <section className="border border-line bg-panel/60 p-3 text-[11.5px] leading-relaxed text-phosphor-dim">
-              <p className="mb-1 tracking-[0.2em] text-[10px]">THREE SOURCES OF TRUTH</p>
-              <p><span className="text-marigold">■ physical</span>: what the relic and the sensors felt.</p>
-              <p><span className="text-phosphor">■ digital</span>: logs, files, pages. They don't lie, but they don't explain.</p>
-              <p><span className="text-violet">■ the ghost's word</span>: what the Caretaker says. Check it.</p>
-              <p className="mt-2 text-amber/80">{standing ? `${standing} of the Caretaker's claims still stand.` : "The Caretaker has nothing left to hide."}</p>
-            </section>
+    <div className="relative flex h-full">
+      <div className={`flex min-w-0 flex-1 flex-col px-[clamp(1.25rem,6vw,6rem)] pb-4 pt-4 transition-[padding] ${panel ? "lg:pr-[min(48%,660px)]" : ""}`}>
+        <header className="mb-6 flex items-center justify-between text-[13px] text-phosphor-dim">
+          <span>vale archive, node 7</span>
+          <span className="flex items-center gap-4">
+            {relicAwake(view) && <Relic view={view} busy={busy} onEvent={async (t) => { const v = await run(() => api.relic(id, t)); if (v) setView(v); }} />}
+            <span>shutdown 00:00</span>
+          </span>
+        </header>
+        {lost ? (
+          <div className="space-y-3">
+            <p className="text-phosphor">The archive restarted, and this case file was lost with it.</p>
+            <button onClick={() => start(true)} className="text-amber hover:underline">&gt; open a new case file</button>
           </div>
-        </div>
-        <div className="flex min-h-[70vh] flex-col border border-line bg-panel/60 p-3 lg:min-h-0">
-          <nav className="mb-3 flex gap-1 text-[11px] tracking-[0.2em]" role="tablist">
-            {([["evidence", `EVIDENCE${unread ? ` · ${unread} NEW` : ""}`], ["ledger", `LEDGER · ${standing} STANDING`], ["theory", "THEORY"]] as const).map(([t, label]) => (
-              <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-                className={`border px-3 py-1.5 ${tab === t ? "border-amber text-amber" : "border-line text-phosphor-dim hover:text-phosphor"}`}>{label}</button>
-            ))}
-          </nav>
-          {tab === "evidence" && (
-            <EvidencePanel view={view} open={open} busy={busy} onOpen={openEvidence}
-              onPin={async (eid) => { const v = await run(() => api.pin(id, eid)); if (v) setView(v); }}
-              onScan={async () => { const v = await run(() => api.scan(id)); if (v) setView(v); }} />
-          )}
-          {tab === "ledger" && (
-            <LedgerPanel view={view} busy={busy} onOpen={openEvidence}
-              onChallenge={async (lieId, cited) => { const r = await run(() => api.challenge(id, lieId, cited)); if (r) setView(r.state); }} />
-          )}
-          {tab === "theory" && (
-            <TheoryPanel view={view} busy={busy} onOpen={openEvidence}
-              onAnswer={async (q, a) => { const v = await run(() => api.answer(id, q, a)); if (v) setView(v); }}
-              onEnd={async (eid) => { const r = await run(() => api.ending(id, eid)); if (r) setView(r.state); }} />
-          )}
-        </div>
+        ) : (
+          <Terminal view={view} local={local} busy={busy} onSubmit={submit} onOpen={openFile} />
+        )}
+        <nav className="mt-2 flex gap-5 text-[13px] text-phosphor-dim" aria-label="Commands">
+          {ORDER.filter((st) => s[st]).map((st) => (
+            <button key={st} onClick={() => { setReading(null); setPanel(panel === st ? null : st); }}
+              className={`hover:text-amber ${panel === st ? "text-amber" : ""}`}>{st}</button>
+          ))}
+          <button onClick={() => submit("help")} className="hover:text-amber">help</button>
+        </nav>
       </div>
-      {view.ending && <Ending view={view} onRestart={() => enter(true)} />}
+
+      <Panel open={panel === "files"} title={reading ? "file" : titles.files} onClose={() => { setPanel(null); setReading(null); }}>
+        <Files view={view} reading={reading} busy={busy} scanUnlocked={s.claims} onOpen={openFile} onBack={() => setReading(null)} onPin={pin}
+          onScan={async () => { const v = await run(() => api.scan(id)); if (v) setView(v); }} />
+      </Panel>
+      <Panel open={panel === "claims"} title={titles.claims} onClose={() => setPanel(null)}>
+        <Claims view={view} busy={busy} onChallenge={challenge} onOpen={openFile} />
+      </Panel>
+      <Panel open={panel === "theory"} title={titles.theory} onClose={() => setPanel(null)}>
+        <Theory view={view} busy={busy}
+          onAnswer={async (q, a) => { const v = await run(() => api.answer(id, q, a)); if (v) setView(v); }}
+          onEnd={async (eid) => { setPanel(null); const r = await run(() => api.ending(id, eid)); if (r) setView(r.state); }} />
+      </Panel>
+
+      {view.ending && (
+        <div className="line-in absolute inset-0 z-40 flex flex-col justify-center bg-screen px-[clamp(1.25rem,8vw,8rem)]">
+          <p className={view.ending.id === "carry" ? "text-marigold" : "text-amber"}>{view.endings.find((x) => x.id === view.ending!.id)?.title}</p>
+          <p className={`mt-6 max-w-[60ch] font-hand text-[clamp(1.3rem,2.4vw,1.75rem)] leading-snug ${view.ending.id === "carry" ? "text-[#ffdcae]" : "text-phosphor"}`}>{view.ending.text}</p>
+          <button onClick={() => start(true)} className="mt-12 w-fit text-[13px] text-phosphor-dim hover:text-amber">&gt; open a new case file</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Monitor() {
+  return (
+    <main className="h-full p-[clamp(0px,1.2vw,14px)]">
+      <div className="screen power-on h-full"><Game /></div>
     </main>
   );
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><Game /></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><Monitor /></StrictMode>);
