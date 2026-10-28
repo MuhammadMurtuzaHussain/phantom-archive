@@ -1,21 +1,14 @@
 import type { View } from "./api";
 
-// The archive's night. It is 09:12 when you connect and the city cuts the power
-// at 00:00, 888 minutes later. Time moves when you act, not while you think:
-// a question costs 25 minutes, reading a new file 6. The candle on the desk
-// burns down with it. Derived from the session, so a resumed case resumes the clock.
+// The archive's night, as the case engine keeps it. It is 09:12 when you connect
+// and the city cuts the power at 00:00. Time moves when you act, not while you
+// think: a question or a confrontation costs 25 minutes, reading a new file 6.
+// The candle on the desk burns down with it.
 
 export const START_MIN = 9 * 60 + 12;
-export const NIGHT_MIN = 24 * 60 - START_MIN;
-
-export function elapsed(v: View): number {
-  const asked = v.transcript.filter((l) => l.role === "investigator").length;
-  const read = v.evidence.filter((e) => e.read).length;
-  return Math.min(NIGHT_MIN, asked * 25 + read * 6);
-}
 
 export function clockLabel(v: View): string {
-  const m = (START_MIN + elapsed(v)) % (24 * 60);
+  const m = (START_MIN + v.clock.elapsed) % (24 * 60);
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
@@ -23,8 +16,19 @@ export function clockLabel(v: View): string {
 let burned = 0;
 const subs = new Set<(b: number) => void>();
 export function setBurned(v: View | null) {
-  burned = v ? elapsed(v) / NIGHT_MIN : 0;
+  burned = v ? v.clock.elapsed / v.clock.minutes : 0;
   subs.forEach((f) => f(burned));
 }
 export const getBurned = () => burned;
 export function onBurn(f: (b: number) => void) { subs.add(f); return () => { subs.delete(f); }; }
+
+/** Whether the archive still has power. At midnight the monitor goes dark with it. */
+let powered = true;
+const powerSubs = new Set<(p: boolean) => void>();
+export function setPowered(p: boolean) {
+  if (p === powered) return;
+  powered = p;
+  powerSubs.forEach((f) => f(p));
+}
+export const isPowered = () => powered;
+export function onPower(f: (p: boolean) => void) { powerSubs.add(f); return () => { powerSubs.delete(f); }; }

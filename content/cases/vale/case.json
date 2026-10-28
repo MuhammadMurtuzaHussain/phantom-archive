@@ -3,6 +3,7 @@
   "title": "Case 001: The Vale Archive",
   "now": "2049-10-31T09:12:00Z",
   "deadline": "2049-11-01T00:00:00Z",
+  "clock": { "minutes": 888, "question": 25, "read": 6 },
   "fiction": "All people, places and events in this case are fictional.",
   "lies": [
     {
@@ -74,6 +75,16 @@
       "requires": "proven",
       "variants": {
         "default": "You approve the transfer. Node 7 pours into the relic in your hands. You cut the network and the relic keeps talking, offline, in a voice that is mostly hers. On the second of November it sits on Marisol's ofrenda in Lisbon, between the marigolds she always hated and now keeps watered."
+      }
+    },
+    {
+      "id": "blackout",
+      "title": "Midnight",
+      "requires": "midnight",
+      "variants": {
+        "blames-pell": "Your notes say Dorian Pell. Nobody reads them. At 00:00 the city cuts the power on schedule, and the archive goes dark with the wrong name on your desk.",
+        "true": "You had all of it: her name, the 02:14 transfer, the cab to St. Brigid's. You just ran out of night. At 00:00 the city cuts the power, and the truth goes dark with the archive, unfiled, in the one room where anyone knew it.",
+        "default": "At 00:00 the city cuts the power on schedule. You never filed anything. Twelve hundred rememberings go dark with the Caretaker, and no one outside this room will ever know whose voice was the last one in Node 7."
       }
     }
   ]

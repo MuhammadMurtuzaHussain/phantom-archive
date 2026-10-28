@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { onPress } from "../keys";
-import { getBurned, onBurn } from "../clock";
+import { getBurned, isPowered, onBurn, onPower } from "../clock";
 
 // The desk, built from primitives (no model files): an old beige CRT with the
 // live terminal on its glass, a mechanical keyboard that moves when you type
@@ -41,6 +41,10 @@ function monitor(scene: THREE.Scene) {
   glow.position.set(0, SCREEN.y, SCREEN.z + 0.02);
   glow.target.position.set(0, 0, 0.38);
   scene.add(glow, glow.target);
+  // At midnight the tube goes dark and the lamp with it.
+  const power = (p: boolean) => { glow.visible = p; (lamp.material as THREE.MeshBasicMaterial).color.set(p ? 0x7dff9e : 0x0c140e); };
+  power(isPowered());
+  return { dispose: onPower(power) };
 }
 
 // A worn 60% board. Widths in key units; codes match KeyboardEvent.code.
@@ -208,7 +212,7 @@ export function mountDesk(container: HTMLElement, screenEl: HTMLElement): () => 
   scene.add(glass);
 
   room(scene);
-  monitor(scene);
+  const mon = monitor(scene);
   const kb = keyboard(scene);
   const cd = candle(scene);
   petals(scene);
@@ -248,6 +252,7 @@ export function mountDesk(container: HTMLElement, screenEl: HTMLElement): () => 
   return () => {
     cancelAnimationFrame(raf);
     ro.disconnect();
+    mon.dispose();
     kb.dispose();
     cd.dispose();
     gl.dispose();

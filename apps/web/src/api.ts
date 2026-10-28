@@ -21,8 +21,10 @@ export type View = {
   transcript: Line[];
   questions: { id: string; prompt: string; answers: Record<string, string> }[];
   theory: Record<string, string>;
+  /** Minutes of the night spent, out of minutes. At the end the city cuts the power. */
+  clock: { elapsed: number; minutes: number };
   endings: { id: string; title: string; open: boolean }[];
-  ending: { id: string; variant: string; text: string } | null;
+  ending: { id: string; title: string; variant: string; text: string } | null;
   scanned: boolean;
   relic: { type: string; at: string }[];
   face: Face;

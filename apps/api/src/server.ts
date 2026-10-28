@@ -9,6 +9,7 @@ import { challengeWorkflow } from "./agent/challenge.ts";
 import { createSession, evidenceFor, getSession, vale, view, type Session } from "./game/store.ts";
 import { ghostTurn } from "./game/ghost.ts";
 import { scanReport } from "./game/scan.ts";
+import { tick } from "./game/night.ts";
 
 export const mastra = new Mastra({ workflows: { challengeWorkflow }, logger: false });
 
@@ -30,11 +31,18 @@ api.use("/:id/*", async (c, next) => {
 });
 api.get("/:id/state", (c) => c.json(view(c.get("s"))));
 
+// Once the case is closed, by choice or by the clock, nothing more can be done in it.
+api.use("/:id/*", async (c, next) => {
+  if (c.req.method === "POST" && c.get("s").state.ending) return c.json({ error: "the case is closed", state: view(c.get("s")) }, 409);
+  await next();
+});
+
 api.get("/:id/evidence/:eid", (c) => {
   const s = c.get("s");
   const e = evidenceFor(s, c.req.param("eid"));
   if (!e) return c.json({ error: "not found" }, 404);
-  s.state = E.readEvidence(vale, s.state, e.id);
+  if (!s.state.ending) s.state = E.readEvidence(vale, s.state, e.id);
+  tick(s);
   return c.json({ evidence: { ...e, unlockedBy: undefined }, state: view(s) });
 });
 
@@ -66,6 +74,7 @@ api.post("/:id/turn", async (c) => {
   const body = z.object({ message: z.string().trim().min(1).max(500) }).safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: "say something" }, 400);
   const turn = await ghostTurn(s, body.data.message);
+  tick(s);
   return c.json({ turn, state: view(s) });
 });
 
@@ -76,6 +85,7 @@ api.post("/:id/challenge", async (c) => {
   const run = await mastra.getWorkflow("challengeWorkflow").createRun();
   const res = await run.start({ inputData: { sessionId: s.id, ...body.data } });
   if (res.status !== "success") return c.json({ error: "challenge failed", status: res.status }, 500);
+  tick(s);
   return c.json({ result: { landed: res.result.landed, reason: res.result.reason }, state: view(s) });
 });
 

@@ -1,10 +1,16 @@
-import { GhostTurn, checkCitations, standingLies } from "@phantom/case-engine";
+import { GhostTurn, ask, checkCitations, elapsed, standingLies } from "@phantom/case-engine";
 import { makeCaretaker } from "../agent/caretaker.ts";
 import { noThinking } from "../agent/model.ts";
 import { type LedgerClaim, type Session, unlockedEvidence, vale } from "./store.ts";
 
 const TURN_TIMEOUT_MS = 90_000;
 const now = () => new Date().toISOString();
+
+function hour(s: Session) {
+  const start = new Date(vale.now);
+  const m = (start.getUTCHours() * 60 + start.getUTCMinutes() + elapsed(vale, s.state)) % (24 * 60);
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
 
 /** The true state of play, written by code, handed to the ghost every turn. */
 export function briefing(s: Session): string {
@@ -21,6 +27,7 @@ export function briefing(s: Session): string {
     free
       ? "Your promise is spent. You may tell the investigator everything the evidence shows, gently."
       : "Your promise: do not say who entered, what happened at 02:14, or where Ines is, beyond what the investigator's evidence already shows.",
+    `It is ${hour(s)}. The city cuts the power to the archive at 00:00, and you with it.`,
     'Sometimes her phrases slip into your speech without your meaning them to: "the line is thin tonight", "I\'ll leave a light on".',
     'Keep the reply under 80 words. face: "grief" when you speak of her, "watching" when they get close, "calm" otherwise.',
   ]
@@ -78,6 +85,7 @@ export function scriptedLine(s: Session): string {
 /** An investigator's question. Falls back to a scripted line, clearly labelled, if Gemma can't answer. */
 export async function ghostTurn(s: Session, message: string) {
   s.transcript.push({ role: "investigator", text: message, at: now() });
+  s.state = ask(s.state);
   try {
     const { turn, stripped } = await speak(s, message);
     const claims = recordClaims(s, turn.claims, "turn");

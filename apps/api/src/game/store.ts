@@ -18,6 +18,8 @@ export type Session = {
   overrides: Record<string, string>;
   relic: RelicLive[];
   face: E.GhostTurn["face"];
+  /** The one-hour warning has been given. */
+  warned: boolean;
 };
 
 const sessions = new Map<string, Session>();
@@ -37,6 +39,7 @@ export function createSession(): Session {
     overrides: {},
     relic: [],
     face: "watching",
+    warned: false,
   };
   sessions.set(id, s);
   return s;
@@ -70,6 +73,7 @@ export function view(s: Session) {
     transcript: s.transcript,
     questions: vale.questions.map((q) => ({ id: q.id, prompt: q.prompt, answers: q.answers })),
     theory: s.state.theory,
+    clock: { elapsed: E.elapsed(vale, s.state), minutes: vale.clock.minutes },
     endings: E.availableEndings(vale, s.state),
     ending: s.state.ending,
     scanned: s.state.scanned,

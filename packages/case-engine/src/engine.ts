@@ -6,13 +6,17 @@ import type { Evidence } from "./schema.ts";
 
 export type Lie = { id: string; claim: string; brokenBy: string[]; concession: string };
 export type Question = { id: string; prompt: string; answers: Record<string, string>; truth: string; proof: string[] };
-export type Ending = { id: string; title: string; requires: "none" | "proven"; variants: Record<string, string> };
+/** "midnight" endings can't be chosen: the clock chooses them. */
+export type Ending = { id: string; title: string; requires: "none" | "proven" | "midnight"; variants: Record<string, string> };
+/** The night in minutes, and what each act costs. Time moves when you act, not while you think. */
+export type Clock = { minutes: number; question: number; read: number };
 
 export type CaseDef = {
   id: string;
   title: string;
   now: string;
   deadline: string;
+  clock: Clock;
   fiction: string;
   evidence: Evidence[];
   lies: Lie[];
@@ -28,8 +32,10 @@ export type SessionState = {
   revised: string[];
   scanned: boolean;
   relicSeen: boolean;
+  /** Questions asked and confrontations made. */
+  asked: number;
   theory: Record<string, string>;
-  ending: { id: string; variant: string; text: string } | null;
+  ending: { id: string; title: string; variant: string; text: string } | null;
   log: { at: number; event: string }[];
 };
 
@@ -60,9 +66,20 @@ const note = (s: SessionState, event: string): SessionState => ({ ...s, log: [..
 
 export function newSession(c: CaseDef): SessionState {
   return settle(c, {
-    caseId: c.id, unlocked: [], read: [], pinned: [], revised: [], scanned: false, relicSeen: false, theory: {}, ending: null, log: [],
+    caseId: c.id, unlocked: [], read: [], pinned: [], revised: [], scanned: false, relicSeen: false, asked: 0, theory: {}, ending: null, log: [],
   });
 }
+
+/** A question or a confrontation costs the night some time. */
+export function ask(s: SessionState): SessionState {
+  return { ...s, asked: s.asked + 1 };
+}
+
+export function elapsed(c: CaseDef, s: SessionState): number {
+  return Math.min(c.clock.minutes, s.asked * c.clock.question + s.read.length * c.clock.read);
+}
+
+export const nightOver = (c: CaseDef, s: SessionState) => elapsed(c, s) >= c.clock.minutes;
 
 export function readEvidence(c: CaseDef, s: SessionState, id: string): SessionState {
   if (!s.unlocked.includes(id) || s.read.includes(id)) return s;
@@ -122,15 +139,26 @@ export function scoreTheory(c: CaseDef, s: SessionState) {
 
 export function availableEndings(c: CaseDef, s: SessionState) {
   const { proven } = scoreTheory(c, s);
-  return c.endings.map((e) => ({ id: e.id, title: e.title, open: e.requires === "none" || proven }));
+  return c.endings.filter((e) => e.requires !== "midnight").map((e) => ({ id: e.id, title: e.title, open: e.requires === "none" || proven }));
+}
+
+function close(c: CaseDef, s: SessionState, e: Ending): SessionState {
+  const { proven } = scoreTheory(c, s);
+  const variant = s.theory.who === "pell" && e.variants["blames-pell"] ? "blames-pell" : proven && e.variants.true ? "true" : "default";
+  const text = e.variants[variant] ?? e.variants.default ?? "";
+  return note({ ...s, ending: { id: e.id, title: e.title, variant, text } }, `ending ${e.id}/${variant}`);
 }
 
 export function chooseEnding(c: CaseDef, s: SessionState, endingId: string): { ok: boolean; state: SessionState } {
   const e = c.endings.find((x) => x.id === endingId);
-  if (!e || s.ending) return { ok: false, state: s };
-  const { proven } = scoreTheory(c, s);
-  if (e.requires === "proven" && !proven) return { ok: false, state: s };
-  const variant = s.theory.who === "pell" && e.variants["blames-pell"] ? "blames-pell" : proven && e.variants.true ? "true" : "default";
-  const text = e.variants[variant] ?? e.variants.default ?? "";
-  return { ok: true, state: note({ ...s, ending: { id: e.id, variant, text } }, `ending ${e.id}/${variant}`) };
+  if (!e || s.ending || e.requires === "midnight" || nightOver(c, s)) return { ok: false, state: s };
+  if (e.requires === "proven" && !scoreTheory(c, s).proven) return { ok: false, state: s };
+  return { ok: true, state: close(c, s, e) };
+}
+
+/** At 00:00 the city cuts the power. If the case is still open, the clock closes it. */
+export function midnight(c: CaseDef, s: SessionState): SessionState {
+  const e = c.endings.find((x) => x.requires === "midnight");
+  if (!e || s.ending || !nightOver(c, s)) return s;
+  return close(c, s, e);
 }

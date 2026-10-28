@@ -61,6 +61,7 @@ Each answer is scored as **proven** (correct, with proof pinned), **hunch** (cor
 | **Preserve** | nothing | You keep her secret. At 00:00 the city cuts the power. The Caretaker thanks you, and then the lights go out. |
 | **Lay to rest** | nothing | You shut it down yourself. The last voice you hear is Ines's, not the Caretaker's. |
 | **Carry her home** | a proven theory, plus consent | The Caretaker asks for your approval (on your phone, via Auth0) to copy Node 7 into the relic. Then we cut the network on camera. The relic keeps talking, offline. On Nov 2 the relic sits on Marisol's ofrenda in Lisbon, among the marigolds. |
+| **Midnight** | running out of night | Not chosen: the clock chooses it. Questions and confrontations cost 25 minutes and each new file 6; an hour out the room warns you. At 00:00 the city cuts the power mid-sentence and the case closes unfiled. If your theory was proven, the text says you had it all and ran out of time; if you blamed Pell, the wrong name sits on your desk in the dark. |
 
 ## Tone
 - Quiet dread, not jump scares. The scariest thing is that the machine is gentle.

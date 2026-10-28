@@ -66,6 +66,7 @@ const record = createStep({
     const s = must(inputData.sessionId);
     const old = s.ledger.find((c) => c.id === `C-${inputData.lieId}`);
     s.transcript.push({ role: "investigator", text: `You confront the Caretaker with ${inputData.cited.join(", ") || "nothing"}.`, at: now() });
+    s.state = E.ask(s.state);
     s.face = inputData.face as Session["face"];
     if (inputData.landed && old) old.status = "revised";
     const made = recordClaims(s, inputData.claims, "challenge", old?.id);

@@ -85,6 +85,28 @@ export function powerOn() {
   startHum();
 }
 
+/** The city cuts the power: the tube's whine falls away and the hum stops. */
+export function powerOff() {
+  if (!ctx || !master) return;
+  const c = ctx;
+  const t = c.currentTime;
+  const o = c.createOscillator();
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(700, t);
+  o.frequency.exponentialRampToValueAtTime(30, t + 1.1);
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 900;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.12, t);
+  g.gain.exponentialRampToValueAtTime(0.0008, t + 1.2);
+  o.connect(lp).connect(g).connect(master);
+  o.start(t);
+  o.stop(t + 1.25);
+  hum?.stop();
+  hum = null;
+}
+
 /** Mains hum from the old set, barely there. */
 function startHum() {
   if (hum) return;
@@ -108,7 +130,7 @@ export function setMuted(m: boolean) {
   muted = m;
   try { localStorage.setItem(KEY, m ? "1" : "0"); } catch { /* fine */ }
   if (master && ctx) master.gain.setTargetAtTime(m ? 0 : 0.9, ctx.currentTime, 0.05);
-  if (!m) startHum();
+  if (!m && ctx) startHum();
   listeners.forEach((f) => f(m));
 }
 export function onMute(f: (m: boolean) => void) { listeners.add(f); return () => { listeners.delete(f); }; }

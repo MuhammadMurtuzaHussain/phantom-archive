@@ -5,6 +5,11 @@ import { codeForChar, press } from "../keys";
 /** A line the browser adds itself (command echoes, hints, help). `after` anchors it in the server transcript. */
 export type LocalLine = { after: number; role: "investigator" | "system"; text: string };
 
+const TICK_MS = 46;
+const PER_TICK = 2;
+/** How long the ghost takes to type a line. */
+export const typingMs = (text: string) => (matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : Math.ceil(text.length / PER_TICK) * TICK_MS);
+
 function Typed({ text, live, onOpen }: { text: string; live: boolean; onOpen: (id: string) => void }) {
   const [n, setN] = useState(live ? 0 : text.length);
   useEffect(() => {
@@ -13,12 +18,12 @@ function Typed({ text, live, onOpen }: { text: string; live: boolean; onOpen: (i
     // The ghost types on your keyboard: each tick presses the key for the newest character.
     let i = 0;
     const t = setInterval(() => {
-      i = Math.min(text.length, i + 2);
+      i = Math.min(text.length, i + PER_TICK);
       const code = codeForChar(text[i - 1] ?? "");
       if (code) press(code, true);
       setN(i);
       if (i >= text.length) clearInterval(t);
-    }, 46);
+    }, TICK_MS);
     return () => clearInterval(t);
   }, [text, live]);
   return n < text.length ? <>{text.slice(0, n)}<span className="caret" /></> : <>{linkify(text, onOpen)}</>;

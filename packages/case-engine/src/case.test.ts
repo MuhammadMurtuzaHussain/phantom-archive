@@ -66,3 +66,34 @@ test("blaming Pell gives the wrongful Expose", () => {
   let s = E.answer(readAll(E.newSession(vale)), "who", "pell");
   assert.equal(E.chooseEnding(vale, s, "expose").state.ending?.variant, "blames-pell");
 });
+
+test("the night is long enough to read every file and still ask plenty", () => {
+  const { minutes, question, read } = vale.clock;
+  const spare = minutes - vale.evidence.length * read;
+  assert.ok(spare / question >= 25, `only ${Math.floor(spare / question)} questions fit`);
+});
+
+test("at midnight the clock closes the case, and no ending can be chosen after", () => {
+  let s = readAll(E.newSession(vale));
+  assert.equal(E.midnight(vale, s), s, "before midnight nothing happens");
+  assert.ok(!E.availableEndings(vale, s).some((e) => e.id === "blackout"), "the player can't pick Midnight");
+  assert.equal(E.chooseEnding(vale, s, "blackout").ok, false);
+  while (!E.nightOver(vale, s)) s = E.ask(s);
+  assert.equal(E.elapsed(vale, s), vale.clock.minutes);
+  assert.equal(E.chooseEnding(vale, s, "preserve").ok, false, "too late to choose");
+  s = E.midnight(vale, s);
+  assert.equal(s.ending?.id, "blackout");
+  assert.equal(s.ending?.title, "Midnight");
+  assert.equal(s.ending?.variant, "default");
+  assert.equal(E.midnight(vale, s), s, "it only happens once");
+});
+
+test("running out of night with the truth pinned gives the bitter Midnight", () => {
+  let s = readAll(E.markRelic(vale, E.markScanned(vale, readAll(E.newSession(vale)))));
+  s = (E.challenge(vale, s, "L1", ["EV-R-001"]) as { state: E.SessionState }).state;
+  s = readAll((E.challenge(vale, s, "L2", ["EV-014"]) as { state: E.SessionState }).state);
+  for (const [q, a] of [["who", "ines"], ["what", "archived"], ["where", "hospice"]] as const) s = E.answer(s, q, a);
+  for (const id of ["EV-006", "EV-017", "EV-021"]) s = E.togglePin(s, id);
+  while (!E.nightOver(vale, s)) s = E.ask(s);
+  assert.equal(E.midnight(vale, s).ending?.variant, "true");
+});

@@ -3,12 +3,12 @@ import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import "./index.css";
 import { api, type Evidence, type View } from "./api";
-import { Terminal, type LocalLine } from "./components/Terminal";
+import { Terminal, typingMs, type LocalLine } from "./components/Terminal";
 import { Claims, Files, Panel, Theory } from "./components/Panels";
 import { Relic } from "./components/Relic";
 import { HELP, hint, parse, relicAwake, stages, type Stage } from "./progress";
-import { clockLabel, setBurned } from "./clock";
-import { isMuted, onMute, powerOn, setMuted } from "./sound";
+import { clockLabel, setBurned, setPowered } from "./clock";
+import { isMuted, onMute, powerOff, powerOn, setMuted } from "./sound";
 import { listenToRealKeyboard } from "./keys";
 import { SCREEN_PX } from "./scene/size";
 
@@ -80,6 +80,15 @@ function Game() {
   const saved = store.get();
 
   useEffect(() => { setBurned(view); }, [view]);
+  // Midnight: let the Caretaker's cut-off line finish typing, then the power goes.
+  const [dark, setDark] = useState(false);
+  const blackout = view?.ending?.id === "blackout";
+  useEffect(() => {
+    if (!blackout) { setDark(false); return; }
+    const last = view!.transcript.findLast((l) => l.role === "ghost");
+    const t = setTimeout(() => { setDark(true); setPowered(false); powerOff(); }, typingMs(last?.text ?? "") + 400);
+    return () => clearTimeout(t);
+  }, [blackout]);
   useEffect(() => { api.health().then((h) => setGhost(`${h.ghost.model} on ${h.ghost.home}`)).catch(() => setGhost("model unreachable")); }, []);
 
   const say = useCallback((role: LocalLine["role"], texts: string[], v: View | null = view) => {
@@ -108,6 +117,7 @@ function Game() {
   }, [view, say]);
 
   const start = useCallback(async (fresh: boolean) => {
+    setPowered(true);
     powerOn();
     const v = await run(async () => {
       if (!fresh && saved) { try { return await api.state(saved); } catch { /* the archive restarted */ } }
@@ -194,49 +204,51 @@ function Game() {
   const pin = async (eid: string) => { const v = await run(() => api.pin(id, eid)); if (v) setView(v); };
 
   return (
-    <div className="relative flex h-full">
-      <div className={`flex min-w-0 flex-1 flex-col px-[clamp(1rem,5cqw,6rem)] pb-3 pt-3 transition-[padding] ${panel ? "@4xl:pr-[min(48%,660px)]" : ""}`}>
-        <header className="mb-4 flex items-center justify-between text-[13px] text-phosphor-dim">
-          <span>vale archive, node 7</span>
-          <span className="flex items-center gap-4">
-            {relicAwake(view) && <Relic view={view} busy={busy} onEvent={async (t) => { const v = await run(() => api.relic(id, t)); if (v) setView(v); }} />}
-            <span title="The archive shuts down at 00:00">{clockLabel(view)}</span>
-            <SoundToggle />
-          </span>
-        </header>
-        {lost ? (
-          <div className="space-y-3">
-            <p className="text-phosphor">The archive restarted, and this case file was lost with it.</p>
-            <button onClick={() => start(true)} className="text-amber hover:underline">&gt; open a new case file</button>
-          </div>
-        ) : (
-          <Terminal view={view} local={local} busy={busy} pending={pending} onSubmit={submit} onOpen={openFile} />
-        )}
-        <nav className="mt-2 flex gap-5 text-[13px] text-phosphor-dim" aria-label="Commands">
-          {ORDER.filter((st) => s[st]).map((st) => (
-            <button key={st} onClick={() => { setReading(null); setPanel(panel === st ? null : st); }}
-              className={`hover:text-amber ${panel === st ? "text-amber" : ""}`}>{st}</button>
-          ))}
-          <button onClick={() => submit("help")} className="hover:text-amber">help</button>
-        </nav>
+    <div className="relative h-full">
+      <div className={`relative flex h-full ${dark ? "power-off" : ""}`}>
+        <div className={`flex min-w-0 flex-1 flex-col px-[clamp(1rem,5cqw,6rem)] pb-3 pt-3 transition-[padding] ${panel ? "@4xl:pr-[min(48%,660px)]" : ""}`}>
+          <header className="mb-4 flex items-center justify-between text-[13px] text-phosphor-dim">
+            <span>vale archive, node 7</span>
+            <span className="flex items-center gap-4">
+              {relicAwake(view) && <Relic view={view} busy={busy} onEvent={async (t) => { const v = await run(() => api.relic(id, t)); if (v) setView(v); }} />}
+              <span title="The archive shuts down at 00:00">{clockLabel(view)}</span>
+              <SoundToggle />
+            </span>
+          </header>
+          {lost ? (
+            <div className="space-y-3">
+              <p className="text-phosphor">The archive restarted, and this case file was lost with it.</p>
+              <button onClick={() => start(true)} className="text-amber hover:underline">&gt; open a new case file</button>
+            </div>
+          ) : (
+            <Terminal view={view} local={local} busy={busy} pending={pending} onSubmit={submit} onOpen={openFile} />
+          )}
+          <nav className="mt-2 flex gap-5 text-[13px] text-phosphor-dim" aria-label="Commands">
+            {ORDER.filter((st) => s[st]).map((st) => (
+              <button key={st} onClick={() => { setReading(null); setPanel(panel === st ? null : st); }}
+                className={`hover:text-amber ${panel === st ? "text-amber" : ""}`}>{st}</button>
+            ))}
+            <button onClick={() => submit("help")} className="hover:text-amber">help</button>
+          </nav>
+        </div>
+
+        <Panel open={panel === "files"} title={reading ? "file" : titles.files} onClose={() => { setPanel(null); setReading(null); }}>
+          <Files view={view} reading={reading} busy={busy} scanUnlocked={s.claims} onOpen={openFile} onBack={() => setReading(null)} onPin={pin}
+            onScan={async () => { const v = await run(() => api.scan(id)); if (v) setView(v); }} />
+        </Panel>
+        <Panel open={panel === "claims"} title={titles.claims} onClose={() => setPanel(null)}>
+          <Claims view={view} busy={busy} onChallenge={challenge} onOpen={openFile} />
+        </Panel>
+        <Panel open={panel === "theory"} title={titles.theory} onClose={() => setPanel(null)}>
+          <Theory view={view} busy={busy}
+            onAnswer={async (q, a) => { const v = await run(() => api.answer(id, q, a)); if (v) setView(v); }}
+            onEnd={async (eid) => { setPanel(null); const r = await run(() => api.ending(id, eid)); if (r) setView(r.state); }} />
+        </Panel>
       </div>
 
-      <Panel open={panel === "files"} title={reading ? "file" : titles.files} onClose={() => { setPanel(null); setReading(null); }}>
-        <Files view={view} reading={reading} busy={busy} scanUnlocked={s.claims} onOpen={openFile} onBack={() => setReading(null)} onPin={pin}
-          onScan={async () => { const v = await run(() => api.scan(id)); if (v) setView(v); }} />
-      </Panel>
-      <Panel open={panel === "claims"} title={titles.claims} onClose={() => setPanel(null)}>
-        <Claims view={view} busy={busy} onChallenge={challenge} onOpen={openFile} />
-      </Panel>
-      <Panel open={panel === "theory"} title={titles.theory} onClose={() => setPanel(null)}>
-        <Theory view={view} busy={busy}
-          onAnswer={async (q, a) => { const v = await run(() => api.answer(id, q, a)); if (v) setView(v); }}
-          onEnd={async (eid) => { setPanel(null); const r = await run(() => api.ending(id, eid)); if (r) setView(r.state); }} />
-      </Panel>
-
-      {view.ending && (
-        <div className="line-in absolute inset-0 z-40 flex flex-col justify-center bg-screen px-[clamp(1.25rem,8cqw,8rem)]">
-          <p className={view.ending.id === "carry" ? "text-marigold" : "text-amber"}>{view.endings.find((x) => x.id === view.ending!.id)?.title}</p>
+      {view.ending && (!blackout || dark) && (
+        <div className={`absolute inset-0 z-40 flex flex-col justify-center px-[clamp(1.25rem,8cqw,8rem)] ${dark ? "after-dark bg-black" : "line-in bg-screen"}`}>
+          <p className={view.ending.id === "carry" ? "text-marigold" : dark ? "text-phosphor-dim" : "text-amber"}>{view.ending.title}</p>
           <p className={`mt-6 max-w-[60ch] font-hand text-[clamp(1.2rem,2.6cqw,1.75rem)] leading-snug ${view.ending.id === "carry" ? "text-[#ffdcae]" : "text-phosphor"}`}>{view.ending.text}</p>
           <button onClick={() => start(true)} className="mt-12 w-fit text-[13px] text-phosphor-dim hover:text-amber">&gt; open a new case file</button>
         </div>
