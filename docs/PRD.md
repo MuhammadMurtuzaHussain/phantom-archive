@@ -176,8 +176,8 @@ phantom-archive/            (new public repo, MIT)
 | Phase | What | Status |
 |---|---|---|
 | **0 · Foundations** | Repo, MIT license, Entire hooks, monorepo (web, api, case-engine, oracle), model adapter, Mastra Caretaker with tools, smoke test 9/10 on Gemma 4 E4B, citation validator with tests, web → API → Gemma round trip | ✅ |
-| **1 · The case** | Write Case 001: evidence corpus, telemetry.csv, timeline, unlock rules, 2 lies, 4 endings. Case engine: state, unlocks, theory scoring, endings, reset | next |
-| **2 · The ghost** | `/api/turn` and the challenge workflow. Claims Ledger. Full CRT UI: terminal, Evidence Browser, Timeline, Board. Simulated relic | |
+| **1 · The case** | Case 001 ([story bible](case-001.md)): 24 evidence items, `telemetry.csv` (1,464 hourly rows, 264 unlabelled), 2 lies, 3-question theory, 4 endings. Pure case engine with 6 playthrough tests | ✅ |
+| **2 · The ghost** | `/api/turn` and the challenge workflow. Claims Ledger. Full CRT UI: terminal, Evidence Browser, Timeline, Board. Simulated relic | next |
 | **3 · The oracle** | TabPFN, z-score and IsolationForest on a DO CPU Droplet. Anomaly Scan in the UI | |
 | **4 · Hosting** | `render.yaml`, live Gemma tier, GPU Droplet with vLLM for eval and filming | |
 | **5 · The relic** | UNO Q bridge: faces, boot, warmth, heartbeat. Gemma E2B on the board for the finale | |

@@ -1,0 +1,80 @@
+{
+  "id": "vale",
+  "title": "Case 001: The Vale Archive",
+  "now": "2049-10-31T09:12:00Z",
+  "deadline": "2049-11-01T00:00:00Z",
+  "fiction": "All people, places and events in this case are fictional.",
+  "lies": [
+    {
+      "id": "L1",
+      "claim": "No one entered the archive between midnight and dawn.",
+      "brokenBy": ["EV-005", "EV-013", "EV-R-001"],
+      "concession": "Someone came in through door E2 at 01:58 with a manual key. You were asked not to say who, so you still won't name her."
+    },
+    {
+      "id": "L2",
+      "claim": "The archive has slept since the notice of 2047. You do not wake the rememberings.",
+      "brokenBy": ["EV-014", "EV-019"],
+      "concession": "Node 7 has been awake for ten nights. Someone was teaching you her voice."
+    }
+  ],
+  "questions": [
+    {
+      "id": "who",
+      "prompt": "Who opened door E2 at 01:58?",
+      "answers": { "ines": "Ines Vale", "pell": "Dorian Pell", "nobody": "No one (sensor fault)", "intruder": "An unknown intruder" },
+      "truth": "ines",
+      "proof": ["EV-006", "EV-016"]
+    },
+    {
+      "id": "what",
+      "prompt": "What happened at 02:14?",
+      "answers": { "archived": "Ines archived herself into Node 7", "theft": "Data theft", "sabotage": "Sabotage before shutdown", "fault": "A power fault" },
+      "truth": "archived",
+      "proof": ["EV-016", "EV-017"]
+    },
+    {
+      "id": "where",
+      "prompt": "Where is Ines now?",
+      "answers": { "hospice": "St. Brigid's Hospice", "inside": "Inside the archive", "taken": "Taken against her will", "fled": "She fled the city" },
+      "truth": "hospice",
+      "proof": ["EV-020", "EV-021"]
+    }
+  ],
+  "endings": [
+    {
+      "id": "expose",
+      "title": "Expose",
+      "requires": "none",
+      "variants": {
+        "blames-pell": "You file the report naming Dorian Pell. He is arrested at the depot at noon. The archive is wiped at midnight anyway, and the Caretaker's last words are a correction you were no longer listening for.",
+        "true": "You file the truth. The city names a reading room after Ines Vale. At midnight it deletes the archive as scheduled: twelve hundred rememberings, and hers.",
+        "default": "You file what you have. It is not enough to stop anything. At midnight the archive is deleted as scheduled."
+      }
+    },
+    {
+      "id": "preserve",
+      "title": "Preserve",
+      "requires": "none",
+      "variants": {
+        "default": "You keep her secret and file nothing. At 00:00 the city cuts the power on schedule. The Caretaker says, \"Thank you for leaving the light on,\" and then there is no light."
+      }
+    },
+    {
+      "id": "rest",
+      "title": "Lay to rest",
+      "requires": "none",
+      "variants": {
+        "default": "You shut Node 7 down yourself, gently, before the city can. The last voice on the speaker isn't the Caretaker's. \"Tell Mari I'm nearly done,\" Ines says. Then: \"Done.\""
+      }
+    },
+    {
+      "id": "carry",
+      "title": "Carry her home",
+      "requires": "proven",
+      "variants": {
+        "default": "You approve the transfer. Node 7 pours into the relic in your hands. You cut the network and the relic keeps talking, offline, in a voice that is mostly hers. On the second of November it sits on Marisol's ofrenda in Lisbon, between the marigolds she always hated and now keeps watered."
+      }
+    }
+  ]
+}
