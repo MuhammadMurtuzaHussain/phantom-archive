@@ -1,0 +1,23 @@
+# The game on Render: one Node web service. The API serves the built web app,
+# talks to Gemma 4 on DigitalOcean serverless inference, and asks the oracle
+# droplet for anomaly scans. Secrets are `sync: false`: set them in the dashboard.
+services:
+  - type: web
+    name: phantom-archive
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter @phantom/web build
+    startCommand: pnpm --filter @phantom/api start
+    healthCheckPath: /api/health
+    envVars:
+      - { key: NODE_ENV, value: production }
+      - { key: NODE_VERSION, value: "24" }
+      - { key: MODEL_BASE_URL, value: https://inference.do-ai.run/v1 }
+      - { key: MODEL_ID, value: gemma-4-31B-it }
+      - { key: MODEL_API_KEY, sync: false } # a DigitalOcean model access key
+      - { key: ORACLE_URL, value: https://64-227-42-86.sslip.io }
+      - { key: DO_SERVICE_TOKEN, sync: false }
+      - { key: MASTRA_ENVIRONMENT, value: production }
+      - { key: MASTRA_PLATFORM_ACCESS_TOKEN, sync: false }
+      - { key: MASTRA_PROJECT_ID, sync: false }
