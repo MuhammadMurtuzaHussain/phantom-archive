@@ -1,0 +1,40 @@
+#cloud-config
+# The Phantom Archive oracle on a small CPU droplet. TabPFN runs behind Caddy,
+# which gets HTTPS automatically on <ip>.sslip.io, so the shared token never
+# crosses the wire in clear. oracle-up.sh fills in the token.
+package_update: true
+packages: [git, caddy, ufw]
+
+write_files:
+  - path: /etc/phantom-oracle.env
+    permissions: "0600"
+    content: |
+      DO_SERVICE_TOKEN=__DO_SERVICE_TOKEN__
+  - path: /etc/systemd/system/phantom-oracle.service
+    content: |
+      [Unit]
+      Description=Phantom Archive oracle (TabPFN anomaly scan)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      User=oracle
+      WorkingDirectory=/opt/phantom-archive/services/oracle
+      EnvironmentFile=/etc/phantom-oracle.env
+      ExecStart=/usr/local/bin/uv run --frozen uvicorn app.main:app --host 127.0.0.1 --port 8787
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # TabPFN's first scan peaks above 1 GB; swap keeps a 2 GB droplet safe.
+  - fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  - useradd --system --create-home --shell /usr/sbin/nologin oracle
+  - git clone --depth 1 https://github.com/MuhammadMurtuzaHussain/phantom-archive /opt/phantom-archive
+  - chown -R oracle:oracle /opt/phantom-archive
+  - curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin INSTALLER_NO_MODIFY_PATH=1 sh
+  - sudo -u oracle -H bash -c 'cd /opt/phantom-archive/services/oracle && /usr/local/bin/uv sync --frozen'
+  - IP=$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address); printf '%s.sslip.io {\n\treverse_proxy 127.0.0.1:8787\n}\n' "$(echo "$IP" | tr . -)" > /etc/caddy/Caddyfile
+  - systemctl daemon-reload && systemctl enable --now phantom-oracle && systemctl restart caddy
+  - ufw allow OpenSSH && ufw allow 80,443/tcp && ufw --force enable
