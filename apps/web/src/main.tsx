@@ -1,5 +1,6 @@
-import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
+import { StrictMode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import "./index.css";
 import { api, type Evidence, type View } from "./api";
 import { Terminal, typingMs, type LocalLine } from "./components/Terminal";
@@ -11,6 +12,9 @@ import { isMuted, onMute, powerOff, powerOn, setMuted } from "./sound";
 import { listenToRealKeyboard } from "./keys";
 import { Intro, introSeen } from "./intro/Intro";
 import { Desk } from "./desk/Desk";
+import { BriefSlot } from "./desk/slot";
+import { Brief } from "./components/Brief";
+import { PROOF, isGuided, onGuided, setGuided, type Step } from "./guide";
 
 const KEY = "phantom-archive:session";
 const store = {
@@ -42,6 +46,7 @@ function Boot({ ghost, resumable, onStart }: { ghost: string; resumable: boolean
     const k = (e: KeyboardEvent) => {
       if (e.key === "Enter") onStart(true);
       if ((e.key === "r" || e.key === "R") && resumable) onStart(false);
+      if ((e.key === "g" || e.key === "G") && !isGuided()) { setGuided(true); onStart(true); }
     };
     addEventListener("keydown", k);
     return () => removeEventListener("keydown", k);
@@ -59,6 +64,7 @@ function Boot({ ghost, resumable, onStart }: { ghost: string; resumable: boolean
           <div className="line-in mt-6 space-y-1">
             <button onClick={() => onStart(true)} className="amber-glow text-amber hover:underline">&gt; press enter to connect<span className="caret" /></button>
             {resumable && <p><button onClick={() => onStart(false)} className="text-phosphor-dim hover:text-amber">&gt; press r to resume your last case file</button></p>}
+            {!isGuided() && <p><button onClick={() => { setGuided(true); onStart(true); }} className="text-phosphor-dim hover:text-amber">&gt; press g for the guided case, about 6 minutes</button></p>}
           </div>
         )}
       </div>
@@ -78,6 +84,10 @@ function Game() {
   const [ghost, setGhost] = useState("connecting");
   const announced = useRef<Set<Stage>>(new Set());
   const saved = store.get();
+  const slot = useContext(BriefSlot);
+  const [guided, setGuidedState] = useState(isGuided());
+  const [stepping, setStepping] = useState(false);
+  useEffect(() => onGuided(setGuidedState), []);
 
   useEffect(() => { setBurned(view); }, [view]);
   // Midnight: let the Caretaker's cut-off line finish typing, then the power goes.
@@ -140,7 +150,12 @@ function Game() {
     return () => removeEventListener("keydown", k);
   }, []);
 
-  if (!view) return <Boot ghost={ghost} resumable={!!saved} onStart={start} />;
+  // The brief lies on the desk when there is one; on phones it is a panel at the bottom.
+  const brief = (body: React.ReactNode) => !guided ? null : slot
+    ? createPortal(body, slot)
+    : <div className="brief-paper fixed inset-x-2 bottom-2 z-50 h-[42vh] overflow-y-auto text-[12px] min-[820px]:inset-x-auto min-[820px]:right-4 min-[820px]:w-[320px]">{body}</div>;
+
+  if (!view) return <><Boot ghost={ghost} resumable={!!saved} onStart={start} />{brief(<Brief view={null} busy={busy} onStep={() => {}} onExit={() => setGuided(false)} />)}</>;
   const id = view.id;
   const s = stages(view);
 
@@ -200,11 +215,42 @@ function Game() {
     }
   };
 
+  /** Do one step of the guided case, through the same paths as typing it. */
+  const doStep = async (st: Step) => {
+    setStepping(true);
+    try {
+      for (const a of st.acts) {
+        if (a.kind === "say" || a.kind === "cmd") await submit(a.text);
+        if (a.kind === "read") {
+          for (const [n, eid] of a.ids.entries()) {
+            if (n === a.ids.length - 1) await openFile(eid);
+            else { const r = await run(() => api.read(id, eid)); if (r) setView(r.state); }
+          }
+        }
+        if (a.kind === "theory") {
+          const v = await run(async () => {
+            let cur = await api.state(id);
+            for (const p of PROOF.pins) if (!cur.evidence.find((e) => e.id === p)?.pinned) cur = await api.pin(id, p);
+            for (const [q, ans] of Object.entries(PROOF.answers)) if (cur.theory[q] !== ans) cur = await api.answer(id, q, ans);
+            return cur;
+          });
+          if (v) { setView(v); setReading(null); setPanel("theory"); }
+        }
+        if (a.kind === "ending") {
+          setPanel(null);
+          const r = await run(() => api.ending(id, a.id));
+          if (r) setView(r.state);
+        }
+      }
+    } finally { setStepping(false); }
+  };
+
   const titles: Record<PanelName, string> = { files: "files", claims: "the Caretaker's claims", theory: "theory" };
   const pin = async (eid: string) => { const v = await run(() => api.pin(id, eid)); if (v) setView(v); };
 
   return (
     <div className="relative h-full">
+      {brief(<Brief view={view} busy={busy || stepping} onStep={doStep} onExit={() => setGuided(false)} />)}
       <div className={`relative flex h-full ${dark ? "power-off" : ""}`}>
         <div className={`flex min-w-0 flex-1 flex-col px-[clamp(1rem,5cqw,6rem)] pb-3 pt-3 transition-[padding] ${panel ? "@4xl:pr-[min(48%,660px)]" : ""}`}>
           <header className="mb-4 flex items-center justify-between text-[13px] text-phosphor-dim">

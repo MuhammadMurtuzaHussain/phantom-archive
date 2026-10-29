@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Snow } from "./Snow";
 import { loadSamples, loop, play, type Loop, type Sample } from "../sound";
+import { setGuided } from "../guide";
 
 // The way in: the investigator lies down in the snow outside the archive, wakes
 // on a rooftop in 2049, walks past the Vale hologram and sits down at the
@@ -140,17 +141,22 @@ export function Intro({ onDone }: { onDone: () => void }) {
     return () => { removeEventListener("keydown", down); removeEventListener("keyup", up); };
   }, [started, finish]);
 
-  // The landing waits for a key or a click: browsers only allow sound after one.
+  // The landing waits for a choice: browsers only allow sound after a key or a click.
+  const begin = useCallback((guided: boolean) => {
+    if (started) return;
+    setGuided(guided);
+    void Promise.race([loadSamples(), new Promise((ok) => setTimeout(ok, 2500))]).then(() => setStarted(true));
+  }, [started]);
   useEffect(() => {
     if (started) return;
-    const go = () => {
-      void Promise.race([loadSamples(), new Promise((ok) => setTimeout(ok, 2500))]).then(() => setStarted(true));
+    const key = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey) return;
+      if (e.key === "g" || e.key === "G") begin(true);
+      else if (e.key === "Enter" || e.key === " ") begin(false);
     };
-    const key = (e: KeyboardEvent) => { if (!e.metaKey && !e.ctrlKey) go(); };
-    addEventListener("keydown", key, { once: true });
-    addEventListener("pointerdown", go, { once: true });
-    return () => { removeEventListener("keydown", key); removeEventListener("pointerdown", go); };
-  }, [started]);
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [started, begin]);
 
   const nextShot = STEPS.slice(i + 1).find((s): s is Shot => s.kind === "shot");
   const isWalk = started && step.kind === "shot" && step.walk;
@@ -189,7 +195,10 @@ export function Intro({ onDone }: { onDone: () => void }) {
           <p className="text-[clamp(0.7rem,0.9vw,0.8rem)] uppercase tracking-[0.5em] text-[#9fb4ad]">Case 001 · The Vale Archive</p>
           <h1 className="mt-4 font-light uppercase leading-none tracking-[0.42em] text-[clamp(1.8rem,5vw,4.2rem)]">Phantom Archive</h1>
           <p className="mt-6 max-w-[46ch] text-[clamp(0.85rem,1.05vw,1rem)] leading-relaxed text-[#b9c8c3]">31 October 2049. The archive shuts down at midnight. Someone went in last night. The archive says no one did.</p>
-          <p className="intro-pulse mt-10 text-[clamp(0.75rem,0.9vw,0.85rem)] uppercase tracking-[0.4em] text-[#e8efec]">Press any key</p>
+          <div className="mt-10 flex flex-wrap items-baseline gap-x-10 gap-y-4 text-[clamp(0.75rem,0.9vw,0.85rem)] uppercase tracking-[0.4em]">
+            <button onClick={() => begin(false)} className="intro-pulse text-[#e8efec] hover:opacity-100">Play · enter</button>
+            <button onClick={() => begin(true)} className="text-[#b9c8c3] transition-colors hover:text-[#e8efec]">Guided case · about 6 min · G</button>
+          </div>
           <p className="mt-3 text-[11px] uppercase tracking-[0.3em] text-[#6f827c]">Headphones recommended · sound on</p>
         </div>
       )}

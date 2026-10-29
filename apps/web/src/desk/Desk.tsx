@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { FLAME, GLASS, PLATE, WICK, frame, type Framing } from "./plate";
+import { BRIEF, FLAME, GLASS, PLATE, WICK, frame, type Framing } from "./plate";
+import { BriefSlot } from "./slot";
+import { isGuided, onGuided } from "../guide";
 import { mountFlame, type Flame } from "./flame";
 import { getBurned, isPowered, onBurn, onPower } from "../clock";
 import { loadSamples, loop, play, type Loop } from "../sound";
@@ -22,6 +24,9 @@ export function Desk({ children }: { children: ReactNode }) {
   const flame = useRef<Flame | null>(null);
   const world = useRef<HTMLDivElement>(null);
   const edgeTimer = useRef<number | undefined>(undefined);
+  const [guided, setGuidedState] = useState(isGuided());
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => onGuided(setGuidedState), []);
 
   useEffect(() => {
     const r = () => setView({ w: innerWidth, h: innerHeight });
@@ -59,7 +64,7 @@ export function Desk({ children }: { children: ReactNode }) {
   useEffect(() => onPower(setPowered), []);
   useEffect(() => { if (getBurned() >= 1) setLit(false); }, []);
 
-  const f = frame(framing, view.w, view.h);
+  const f = frame(framing, view.w, view.h, guided);
   const toPlate = (cx: number, cy: number) => ({ x: (cx - f.x) / f.s, y: (cy - f.y) / f.s });
 
   const onMove = (e: React.PointerEvent) => {
@@ -105,12 +110,17 @@ export function Desk({ children }: { children: ReactNode }) {
         <div className="absolute overflow-hidden" onClick={() => setFraming("close")}
           style={{ left: GLASS.x, top: GLASS.y, width: GLASS.w, height: GLASS.h, borderRadius: GLASS.radius }}>
           <div className="origin-top-left" style={{ width: SCREEN.w, height: SCREEN.h, transform: `scale(${GLASS.w / SCREEN.w})` }}>
-            {children}
+            <BriefSlot.Provider value={guided ? slot : null}>{children}</BriefSlot.Provider>
           </div>
           <div className="pointer-events-none absolute inset-0 mix-blend-screen opacity-30"
             style={{ backgroundImage: `url(${PLATE.src})`, backgroundSize: `${PLATE.w}px ${PLATE.h}px`, backgroundPosition: `-${GLASS.x}px -${GLASS.y}px` }} />
           <div className="pointer-events-none absolute inset-0" style={{ borderRadius: GLASS.radius, boxShadow: "inset 0 0 60px 18px rgb(0 0 0 / 0.65), inset 0 0 8px 2px rgb(0 0 0 / 0.8)" }} />
         </div>
+
+        {/* The guided brief, taped to the monitor. Its contents come from the game, through a portal. */}
+        {guided && (
+          <div ref={setSlot} className="brief-paper absolute" style={{ left: BRIEF.x, top: BRIEF.y, width: BRIEF.w, height: BRIEF.h, fontSize: 9.6 }} />
+        )}
 
         {/* After midnight the city's power is gone; only what light is left in the room. */}
         <div className={`pointer-events-none absolute inset-0 bg-black transition-opacity duration-[2500ms] ${powered ? "opacity-0" : "opacity-55"}`} />

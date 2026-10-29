@@ -6,6 +6,9 @@ export const PLATE = { w: 2736, h: 1536, src: "/desk/desk.jpg" };
 /** The CRT's glass. The live terminal sits here, under the photo's own reflections. */
 export const GLASS = { x: 1002, y: 525, w: 563, h: 415, radius: 46 };
 
+/** The guided brief, taped over the monitor's side panel. */
+export const BRIEF = { x: 1616, y: 548, w: 262, h: 440 };
+
 /** The patch around the candle flame that the shader redraws. */
 export const FLAME = { x: 266, y: 822, w: 104, h: 168 };
 /** Where the flame stands inside that patch, in its pixels: wick and tip. */
@@ -13,7 +16,7 @@ export const WICK = { x: 52, y: 153, tip: 53 };
 
 /** The two framings: leaning in on the screen, or sitting back to see the desk. */
 export type Framing = "close" | "wide";
-export function frame(f: Framing, vw: number, vh: number) {
+export function frame(f: Framing, vw: number, vh: number, guided = false) {
   if (f === "wide") {
     const s = Math.max(vw / PLATE.w, vh / PLATE.h);
     return { s, x: (vw - PLATE.w * s) / 2, y: (vh - PLATE.h * s) / 2 };
@@ -22,5 +25,6 @@ export function frame(f: Framing, vw: number, vh: number) {
   const s = Math.min((vw * 0.56) / GLASS.w, (vh * 0.7) / GLASS.h);
   const cx = GLASS.x + GLASS.w / 2;
   const cy = GLASS.y + GLASS.h / 2;
-  return { s, x: vw / 2 - cx * s, y: vh * 0.47 - cy * s };
+  // Guided, the screen moves left so the brief beside it stays in view.
+  return { s, x: vw * (guided ? 0.4 : 0.5) - cx * s, y: vh * 0.47 - cy * s };
 }

@@ -98,3 +98,24 @@ input { caret-color: var(--color-amber); }
   15% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-140px) translateX(18px) scaleY(1.8) scaleX(1.6); }
 }
+
+/* The guided brief: a typed slip of paper, taped to the monitor. */
+.brief-paper {
+  transform: rotate(1.4deg);
+  background:
+    radial-gradient(ellipse at 30% 20%, rgb(255 255 255 / 0.35), transparent 60%),
+    linear-gradient(180deg, #ece6d8 0%, #e3dccb 100%);
+  box-shadow: 0 6px 14px rgb(0 0 0 / 0.45), 0 1px 2px rgb(0 0 0 / 0.4);
+  font-family: var(--font-mono);
+}
+.brief-paper::before {
+  content: ""; position: absolute; top: -9px; left: 38%; width: 64px; height: 18px;
+  background: rgb(232 222 196 / 0.75); transform: rotate(-3deg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+}
+.brief-box { flex: none; width: 0.85em; height: 0.85em; border: 1px solid #6d665a; position: relative; }
+.brief-box-done::after {
+  content: "✓"; position: absolute; left: -0.05em; top: -0.55em;
+  font-family: var(--font-hand); font-size: 1.5em; font-weight: 600; color: #b3261e;
+}
+.brief-note { animation: line-in 500ms ease-out both; }
